@@ -1,0 +1,8 @@
+/* App-specific styles */
+body {
+  overflow-x: hidden;
+}
+
+main {
+  flex: 1;
+}
