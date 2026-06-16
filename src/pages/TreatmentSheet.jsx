@@ -1,7 +1,6 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { useEffect, useState, useLocation } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import Navbar from '../components/Navbar'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -18,6 +17,8 @@ export default function TreatmentSheet() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  const today = new Date().toISOString().split('T')[0]
+
   const [animal, setAnimal] = useState(null)
   const [treatments, setTreatments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,17 +26,20 @@ export default function TreatmentSheet() {
   const [formData, setFormData] = useState({ drug_name: '', notes: '' })
   const [savingIds, setSavingIds] = useState(new Set())
 
-  const today = new Date().toISOString().split('T')[0]
+  // Format date for display
+  const formatDateDisplay = (dateStr) => {
+    const date = new Date(dateStr + 'T00:00:00Z')
+    const options = { day: 'numeric', month: 'short', year: 'numeric' }
+    return date.toLocaleDateString('en-GB', options)
+  }
 
-  useEffect(() => {
-    fetchData()
-  }, [id])
-
+  // Fetch all data
   const fetchData = async () => {
+    setLoading(true)
     try {
       const [animalRes, treatmentsRes] = await Promise.all([
         supabase.from('animals').select('*').eq('id', id).single(),
-        supabase.from('treatment_entries').select('*').eq('animal_id', id).eq('date', today).order('created_at', { ascending: false })
+        supabase.from('treatment_entries').select('*').eq('animal_id', id).order('date', { ascending: false })
       ])
 
       if (animalRes.data) setAnimal(animalRes.data)
@@ -47,23 +51,46 @@ export default function TreatmentSheet() {
     }
   }
 
+  useEffect(() => {
+    if (id) fetchData()
+  }, [id])
+
+  // Group entries by date
+  const groupByDate = () => {
+    const groups = {}
+    treatments.forEach((t) => {
+      if (!groups[t.date]) groups[t.date] = []
+      groups[t.date].push(t)
+    })
+    return Object.entries(groups).sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+  }
+
+  const dateGroups = groupByDate()
+
+  // Handle checkbox change
   const handleCheckboxChange = async (treatmentId, field) => {
-    const treatment = treatments.find(t => t.id === treatmentId)
+    const treatment = treatments.find((t) => t.id === treatmentId)
     if (!treatment) return
 
-    setSavingIds(prev => new Set([...prev, treatmentId]))
+    // Only allow edits for today
+    if (treatment.date !== today) return
+
+    setSavingIds((prev) => new Set([...prev, treatmentId]))
     try {
       const updateData = {}
       updateData[field] = !treatment[field]
+
       await supabase.from('treatment_entries').update(updateData).eq('id', treatmentId)
 
-      setTreatments(prev =>
-        prev.map(t => t.id === treatmentId ? { ...t, [field]: !treatment[field] } : t)
+      setTreatments((prev) =>
+        prev.map((t) =>
+          t.id === treatmentId ? { ...t, [field]: !treatment[field] } : t
+        )
       )
     } catch (err) {
       console.error('Error updating treatment:', err)
     } finally {
-      setSavingIds(prev => {
+      setSavingIds((prev) => {
         const updated = new Set(prev)
         updated.delete(treatmentId)
         return updated
@@ -71,6 +98,7 @@ export default function TreatmentSheet() {
     }
   }
 
+  // Add new medicine
   const handleAddMedicine = async (e) => {
     e.preventDefault()
     if (!formData.drug_name.trim()) return
@@ -82,7 +110,7 @@ export default function TreatmentSheet() {
         notes: formData.notes,
         date: today,
         morning_given: false,
-        evening_given: false
+        evening_given: false,
       })
 
       setFormData({ drug_name: '', notes: '' })
@@ -93,123 +121,1014 @@ export default function TreatmentSheet() {
     }
   }
 
-  if (loading) return <div style={{ padding: '16px', textAlign: 'center' }}>Loading...</div>
-  if (!animal) return <div style={{ padding: '16px', textAlign: 'center' }}>Animal not found</div>
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+        <div style={{ padding: '16px', textAlign: 'center' }}>Loading...</div>
+      </div>
+    )
+  }
+
+  if (!animal) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+        <div style={{ padding: '16px', textAlign: 'center' }}>Animal not found</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
-      <Navbar />
-      <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column' }}>
-        {/* Back Button */}
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', zIndex: 10 }}>←</button>
+      {/* TOP SECTION (Sticky, compact) */}
+      <div
+        style={{
+          backgroundColor: '#F5F5F5',
+          padding: '16px',
+          borderBottomLeftRadius: '16px',
+          borderBottomRightRadius: '16px',
+          maxHeight: '150px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+        }}
+      >
+        {/* Back Arrow */}
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '16px',
+            background: 'none',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+            color: '#000000',
+            padding: 0,
+            lineHeight: 1,
+          }}
+          aria-label="Go back"
+        >
+          ←
+        </button>
 
-        {/* Top Section */}
-        <div style={{ padding: '16px', paddingTop: '48px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', maxHeight: '150px', display: 'flex', gap: '12px' }}>
-          {/* Photo */}
-          <div style={{ width: '50px', height: '50px', borderRadius: '50%', backgroundColor: '#F5F5F5', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🐾</div>
+        {/* Content */}
+        <div style={{ display: 'flex', gap: '12px', marginLeft: '40px' }}>
+          {/* Animal Photo */}
+          <div
+            style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              backgroundColor: '#E0E0E0',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+            }}
+          >
+            {animal.photo ? (
+              <img
+                src={animal.photo}
+                alt={animal.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : (
+              '🐾'
+            )}
+          </div>
 
           {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: '0 0 2px 0', fontSize: '15px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</p>
-            <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>{animal.animal_id}</p>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '3px 6px', borderRadius: '10px', fontSize: '11px' }}>{animal.admission_date}</span>
-              <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '3px 6px', borderRadius: '10px', fontSize: '11px' }}>{animal.gender}</span>
+            {/* Name & ID */}
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#000000' }}>
+                {animal.name}
+              </div>
+              <div style={{ fontSize: '12px', color: '#666666' }}>
+                {animal.animal_id}
+              </div>
             </div>
-            <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{animal.initial_assessment || 'No details'}</p>
-            <span style={{ display: 'inline-block', backgroundColor: getStatusColor(animal.current_status), color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000', padding: '3px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold' }}>{animal.current_status}</span>
+
+            {/* Chips: Gender, Ward, Status */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              {animal.gender && (
+                <span
+                  style={{
+                    backgroundColor: '#E0E0E0',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    color: '#555555',
+                  }}
+                >
+                  {animal.gender}
+                </span>
+              )}
+              {animal.ward && (
+                <span
+                  style={{
+                    backgroundColor: '#E0E0E0',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    color: '#555555',
+                  }}
+                >
+                  {animal.ward}
+                </span>
+              )}
+              {animal.current_status && (
+                <span
+                  style={{
+                    backgroundColor: getStatusColor(animal.current_status),
+                    color:
+                      animal.current_status === 'critical' ||
+                      animal.current_status === 'moderate'
+                        ? '#FFFFFF'
+                        : '#000000',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {animal.current_status}
+                </span>
+              )}
+            </div>
+
+            {/* Admission Date */}
+            {animal.admission_date && (
+              <div style={{ fontSize: '12px', color: '#666666' }}>
+                Admitted: {formatDateDisplay(animal.admission_date)}
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Table Section */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-          {treatments.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#666', padding: '32px 16px' }}>
-              <p style={{ fontSize: '14px', margin: 0 }}>No medicines for today</p>
+      {/* MAIN CONTENT (Scrollable) */}
+      <main style={{ flex: 1, paddingBottom: '100px', overflow: 'auto', backgroundColor: '#FFFFFF' }}>
+        {treatments.length === 0 ? (
+          // EMPTY STATE
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '80px 16px',
+              textAlign: 'center',
+              color: '#999999',
+            }}
+          >
+            <div style={{ fontSize: '16px', marginBottom: '24px' }}>
+              No medication records yet
             </div>
-          ) : (
-            <div style={{ marginBottom: '16px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #E0E0E0', backgroundColor: '#F9F9F9' }}>
-                    <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 'bold', fontSize: '12px' }}>Drug Name</th>
-                    <th style={{ textAlign: 'center', padding: '10px 4px', fontWeight: 'bold', fontSize: '12px' }}>M</th>
-                    <th style={{ textAlign: 'center', padding: '10px 4px', fontWeight: 'bold', fontSize: '12px' }}>E</th>
-                    <th style={{ textAlign: 'left', padding: '10px 8px', fontWeight: 'bold', fontSize: '12px' }}>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {treatments.map(t => (
-                    <tr key={t.id} style={{ borderBottom: '1px solid #E0E0E0' }}>
-                      <td style={{ padding: '12px 8px', fontSize: '13px', fontWeight: '500' }}>{t.drug_name}</td>
-                      <td style={{ textAlign: 'center', padding: '12px 4px' }}>
-                        <input
-                          type="checkbox"
-                          checked={t.morning_given}
-                          onChange={() => handleCheckboxChange(t.id, 'morning_given')}
-                          disabled={savingIds.has(t.id)}
-                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center', padding: '12px 4px' }}>
-                        <input
-                          type="checkbox"
-                          checked={t.evening_given}
-                          onChange={() => handleCheckboxChange(t.id, 'evening_given')}
-                          disabled={savingIds.has(t.id)}
-                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                        />
-                      </td>
-                      <td style={{ padding: '12px 8px', fontSize: '12px', color: '#666', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.notes || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
+        ) : (
+          // MEDICATION HISTORY
+          <div style={{ paddingTop: '16px' }}>
+            {dateGroups.map(([date, entries]) => {
+              const isToday = date === today
+              return (
+                <div key={date} style={{ paddingLeft: '16px', paddingRight: '16px', marginBottom: '24px' }}>
+                  {/* Date Header (Sticky within section) */}
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: '#000000',
+                      marginBottom: '12px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid #E0E0E0',
+                    }}
+                  >
+                    {formatDateDisplay(date)}
+                  </div>
 
-          {/* Add Medicine Button */}
-          <button onClick={() => setShowForm(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', color: '#000', marginTop: '16px' }}>+ Add Medicine</button>
-        </div>
+                  {/* Entries for this date */}
+                  {entries.map((entry) => {
+                    const isSaving = savingIds.has(entry.id)
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #F0F0F0',
+                        }}
+                      >
+                        {/* Drug Name & Notes */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000000' }}>
+                            {entry.drug_name}
+                          </div>
+                          {entry.notes && (
+                            <div style={{ fontSize: '12px', color: '#999999', marginTop: '2px' }}>
+                              {entry.notes}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Checkboxes */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '12px',
+                            marginLeft: '16px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {/* Morning Checkbox */}
+                          <button
+                            onClick={() => isToday && handleCheckboxChange(entry.id, 'morning_given')}
+                            disabled={!isToday || isSaving}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              border: '2px solid #E0E0E0',
+                              backgroundColor: entry.morning_given ? '#F5C800' : '#FFFFFF',
+                              cursor: isToday && !isSaving ? 'pointer' : 'not-allowed',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: entry.morning_given ? '#000000' : '#999999',
+                              transition: 'all 0.2s ease',
+                              opacity: isToday && !isSaving ? 1 : 0.6,
+                            }}
+                            title={isToday ? 'Toggle Morning' : 'Past date - read only'}
+                          >
+                            {entry.morning_given ? '✓M' : 'M'}
+                          </button>
+
+                          {/* Evening Checkbox */}
+                          <button
+                            onClick={() => isToday && handleCheckboxChange(entry.id, 'evening_given')}
+                            disabled={!isToday || isSaving}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              border: '2px solid #E0E0E0',
+                              backgroundColor: entry.evening_given ? '#F5C800' : '#FFFFFF',
+                              cursor: isToday && !isSaving ? 'pointer' : 'not-allowed',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: entry.evening_given ? '#000000' : '#999999',
+                              transition: 'all 0.2s ease',
+                              opacity: isToday && !isSaving ? 1 : 0.6,
+                            }}
+                            title={isToday ? 'Toggle Evening' : 'Past date - read only'}
+                          >
+                            {entry.evening_given ? '✓E' : 'E'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </main>
 
-      {/* Add Medicine Form Sheet */}
+      {/* Floating Add Medicine Button */}
+      <button
+        onClick={() => setShowForm(true)}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '16px',
+          right: '16px',
+          padding: '14px 20px',
+          backgroundColor: '#F5C800',
+          border: 'none',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          color: '#000000',
+          boxShadow: '0 4px 12px rgba(245, 200, 0, 0.2)',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)')}
+        onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)')}
+      >
+        + Add Medicine
+      </button>
+
+      {/* Add Medicine Modal */}
       {showForm && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderRadius: '16px 16px 0 0', padding: '16px', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', maxHeight: '70vh', overflowY: 'auto', zIndex: 1000 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Add Medicine</h3>
-            <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px 16px 0 0',
+              padding: '20px 16px 24px 16px',
+              boxShadow: '0 -4px 12px rgba(0,0,0,0.15)',
+              maxHeight: '70vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#000000' }}>
+                Add Medicine
+              </h3>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '28px',
+                  cursor: 'pointer',
+                  color: '#999999',
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAddMedicine}>
+              {/* Drug Name Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#666666',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Drug Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Amoxicillin"
+                  required
+                  value={formData.drug_name}
+                  onChange={(e) => setFormData({ ...formData, drug_name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #E0E0E0',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Notes Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#666666',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. After food"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #E0E0E0',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Date Display */}
+              <div
+                style={{
+                  marginBottom: '20px',
+                  padding: '12px 14px',
+                  backgroundColor: '#F9F9F9',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  color: '#666666',
+                }}
+              >
+                Adding for: <strong>{formatDateDisplay(today)}</strong>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  backgroundColor: '#F5C800',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  color: '#000000',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                Save Medicine
+              </button>
+            </form>
           </div>
-
-          <form onSubmit={handleAddMedicine}>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Drug Name *</label>
-              <input
-                type="text"
-                placeholder="e.g. Amoxicillin"
-                required
-                value={formData.drug_name}
-                onChange={(e) => setFormData({ ...formData, drug_name: e.target.value })}
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Notes</label>
-              <input
-                type="text"
-                placeholder="e.g. After food"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box' }}
-              />
-            </div>
-
-            <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', color: '#000' }}>Save Medicine</button>
-          </form>
         </div>
       )}
+    </div>
+  )
+}
 
+  // Group entries by date
+  const groupByDate = () => {
+    const groups = {}
+    treatments.forEach((t) => {
+      if (!groups[t.date]) groups[t.date] = []
+      groups[t.date].push(t)
+    })
+    return Object.entries(groups).sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+  }
+
+  const dateGroups = groupByDate()
+
+  // Handle checkbox change
+  const handleCheckboxChange = async (treatmentId, field) => {
+    const treatment = treatments.find((t) => t.id === treatmentId)
+    if (!treatment) return
+
+    // Only allow edits for today
+    if (treatment.date !== today) return
+
+    setSavingIds((prev) => new Set([...prev, treatmentId]))
+    try {
+      const updateData = {}
+      updateData[field] = !treatment[field]
+
+      await supabase.from('treatment_entries').update(updateData).eq('id', treatmentId)
+
+      setTreatments((prev) =>
+        prev.map((t) =>
+          t.id === treatmentId ? { ...t, [field]: !treatment[field] } : t
+        )
+      )
+    } catch (err) {
+      console.error('Error updating treatment:', err)
+    } finally {
+      setSavingIds((prev) => {
+        const updated = new Set(prev)
+        updated.delete(treatmentId)
+        return updated
+      })
+    }
+  }
+
+  // Add new medicine
+  const handleAddMedicine = async (e) => {
+    e.preventDefault()
+    if (!formData.drug_name.trim()) return
+
+    try {
+      await supabase.from('treatment_entries').insert({
+        animal_id: animalId,
+        drug_name: formData.drug_name,
+        notes: formData.notes,
+        date: today,
+        morning_given: false,
+        evening_given: false,
+      })
+
+      setFormData({ drug_name: '', notes: '' })
+      setShowForm(false)
+      await fetchData()
+    } catch (err) {
+      console.error('Error adding medicine:', err)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+        <div style={{ padding: '16px', textAlign: 'center' }}>Loading...</div>
+      </div>
+    )
+  }
+
+  if (!animal) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+        <div style={{ padding: '16px', textAlign: 'center' }}>Animal not found</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+      {/* TOP SECTION (Sticky, compact) */}
+      <div
+        style={{
+          backgroundColor: '#F5F5F5',
+          padding: '16px',
+          borderBottomLeftRadius: '16px',
+          borderBottomRightRadius: '16px',
+          maxHeight: '150px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+        }}
+      >
+        {/* Back Arrow */}
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '16px',
+            background: 'none',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+            color: '#000000',
+            padding: 0,
+            lineHeight: 1,
+          }}
+          aria-label="Go back"
+        >
+          ←
+        </button>
+
+        {/* Content */}
+        <div style={{ display: 'flex', gap: '12px', marginLeft: '40px' }}>
+          {/* Animal Photo */}
+          <div
+            style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              backgroundColor: '#E0E0E0',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+            }}
+          >
+            {animal.photo ? (
+              <img
+                src={animal.photo}
+                alt={animal.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : (
+              '🐾'
+            )}
+          </div>
+
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Name & ID */}
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#000000' }}>
+                {animal.name}
+              </div>
+              <div style={{ fontSize: '12px', color: '#666666' }}>
+                {animal.animal_id}
+              </div>
+            </div>
+
+            {/* Chips: Gender, Ward, Status */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              {animal.gender && (
+                <span
+                  style={{
+                    backgroundColor: '#E0E0E0',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    color: '#555555',
+                  }}
+                >
+                  {animal.gender}
+                </span>
+              )}
+              {animal.ward && (
+                <span
+                  style={{
+                    backgroundColor: '#E0E0E0',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    color: '#555555',
+                  }}
+                >
+                  {animal.ward}
+                </span>
+              )}
+              {animal.current_status && (
+                <span
+                  style={{
+                    backgroundColor: getStatusColor(animal.current_status),
+                    color:
+                      animal.current_status === 'critical' ||
+                      animal.current_status === 'moderate'
+                        ? '#FFFFFF'
+                        : '#000000',
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {animal.current_status}
+                </span>
+              )}
+            </div>
+
+            {/* Admission Date */}
+            {animal.admission_date && (
+              <div style={{ fontSize: '12px', color: '#666666' }}>
+                Admitted: {formatDateDisplay(animal.admission_date)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT (Scrollable) */}
+      <main style={{ flex: 1, paddingBottom: '100px', overflow: 'auto', backgroundColor: '#FFFFFF' }}>
+        {treatments.length === 0 ? (
+          // EMPTY STATE
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '80px 16px',
+              textAlign: 'center',
+              color: '#999999',
+            }}
+          >
+            <div style={{ fontSize: '16px', marginBottom: '24px' }}>
+              No medication records yet
+            </div>
+          </div>
+        ) : (
+          // MEDICATION HISTORY
+          <div style={{ paddingTop: '16px' }}>
+            {dateGroups.map(([date, entries]) => {
+              const isToday = date === today
+              return (
+                <div key={date} style={{ paddingLeft: '16px', paddingRight: '16px', marginBottom: '24px' }}>
+                  {/* Date Header (Sticky within section) */}
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: '#000000',
+                      marginBottom: '12px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid #E0E0E0',
+                    }}
+                  >
+                    {formatDateDisplay(date)}
+                  </div>
+
+                  {/* Entries for this date */}
+                  {entries.map((entry) => {
+                    const isSaving = savingIds.has(entry.id)
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #F0F0F0',
+                        }}
+                      >
+                        {/* Drug Name & Notes */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000000' }}>
+                            {entry.drug_name}
+                          </div>
+                          {entry.notes && (
+                            <div style={{ fontSize: '12px', color: '#999999', marginTop: '2px' }}>
+                              {entry.notes}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Checkboxes */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '12px',
+                            marginLeft: '16px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {/* Morning Checkbox */}
+                          <button
+                            onClick={() => isToday && handleCheckboxChange(entry.id, 'morning_given')}
+                            disabled={!isToday || isSaving}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              border: '2px solid #E0E0E0',
+                              backgroundColor: entry.morning_given ? '#F5C800' : '#FFFFFF',
+                              cursor: isToday && !isSaving ? 'pointer' : 'not-allowed',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: entry.morning_given ? '#000000' : '#999999',
+                              transition: 'all 0.2s ease',
+                              opacity: isToday && !isSaving ? 1 : 0.6,
+                            }}
+                            title={isToday ? 'Toggle Morning' : 'Past date - read only'}
+                          >
+                            {entry.morning_given ? '✓M' : 'M'}
+                          </button>
+
+                          {/* Evening Checkbox */}
+                          <button
+                            onClick={() => isToday && handleCheckboxChange(entry.id, 'evening_given')}
+                            disabled={!isToday || isSaving}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              border: '2px solid #E0E0E0',
+                              backgroundColor: entry.evening_given ? '#F5C800' : '#FFFFFF',
+                              cursor: isToday && !isSaving ? 'pointer' : 'not-allowed',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: entry.evening_given ? '#000000' : '#999999',
+                              transition: 'all 0.2s ease',
+                              opacity: isToday && !isSaving ? 1 : 0.6,
+                            }}
+                            title={isToday ? 'Toggle Evening' : 'Past date - read only'}
+                          >
+                            {entry.evening_given ? '✓E' : 'E'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </main>
+
+      {/* Floating Add Medicine Button */}
+      <button
+        onClick={() => setShowForm(true)}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '16px',
+          right: '16px',
+          padding: '14px 20px',
+          backgroundColor: '#F5C800',
+          border: 'none',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: 'pointer',
+          color: '#000000',
+          boxShadow: '0 4px 12px rgba(245, 200, 0, 0.2)',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseEnter={(e) => (e.target.style.transform = 'translateY(-2px)')}
+        onMouseLeave={(e) => (e.target.style.transform = 'translateY(0)')}
+      >
+        + Add Medicine
+      </button>
+
+      {/* Add Medicine Modal */}
+      {showForm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px 16px 0 0',
+              padding: '20px 16px 24px 16px',
+              boxShadow: '0 -4px 12px rgba(0,0,0,0.15)',
+              maxHeight: '70vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#000000' }}>
+                Add Medicine
+              </h3>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '28px',
+                  cursor: 'pointer',
+                  color: '#999999',
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAddMedicine}>
+              {/* Drug Name Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#666666',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Drug Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Amoxicillin"
+                  required
+                  value={formData.drug_name}
+                  onChange={(e) => setFormData({ ...formData, drug_name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #E0E0E0',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Notes Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#666666',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. After food"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #E0E0E0',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Date Display */}
+              <div
+                style={{
+                  marginBottom: '20px',
+                  padding: '12px 14px',
+                  backgroundColor: '#F9F9F9',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  color: '#666666',
+                }}
+              >
+                Adding for: <strong>{formatDateDisplay(today)}</strong>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  backgroundColor: '#F5C800',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  color: '#000000',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                Save Medicine
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
