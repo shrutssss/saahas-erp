@@ -3,7 +3,6 @@ import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import Navbar from '../components/Navbar'
-import BottomNav from '../components/BottomNav'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -174,10 +173,16 @@ export default function AnimalProfile() {
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
         {/* Top Section */}
         <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', position: 'relative' }}>
-          <button onClick={() => navigate(-1)} style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
+          <button onClick={() => navigate('/dashboard')} style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
           
           {role && (role === 'admin' || role === 'doctor') && (
-            <button onClick={() => navigate(`/register`)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✎</button>
+            <button
+              onClick={() => navigate('/register', { state: { animal } })}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}
+              aria-label="Edit animal"
+            >
+              ✎
+            </button>
           )}
 
           <div style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
@@ -439,7 +444,6 @@ export default function AnimalProfile() {
         </div>
       )}
 
-      <BottomNav />
     </div>
   )
 }

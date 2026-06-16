@@ -6,7 +6,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   return (

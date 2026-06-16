@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [animalStats, setAnimalStats] = useState([])
+  const [speciesCounts, setSpeciesCounts] = useState({ dog: 0, cat: 0, cow: 0, other: 0 })
   const [monthlyStats, setMonthlyStats] = useState({})
   const [originalStats, setOriginalStats] = useState({})
   const [isEditing, setIsEditing] = useState(false)
@@ -21,18 +20,14 @@ export default function Dashboard() {
         // Fetch animals by species
         const { data: animals } = await supabase.from('animals').select('species').eq('is_active', true)
         if (animals) {
-          const counts = {}
+          const counts = { dog: 0, cat: 0, cow: 0, other: 0 }
           animals.forEach((a) => {
             const species = a.species?.toLowerCase() || 'other'
-            counts[species] = (counts[species] || 0) + 1
+            const normalized = counts[species] !== undefined ? species : 'other'
+            counts[normalized] += 1
           })
 
-          const chartData = Object.entries(counts).map(([species, count]) => ({
-            name: species.charAt(0).toUpperCase() + species.slice(1),
-            value: count,
-            species,
-          }))
-          setAnimalStats(chartData)
+          setSpeciesCounts(counts)
         }
 
         // Fetch monthly stats
@@ -147,12 +142,12 @@ export default function Dashboard() {
     )
   }
 
-  const COLORS = {
-    dog: '#F5C800',
-    cat: '#14B8A6',
-    cow: '#A855F7',
-    other: '#EF4444',
-  }
+  const speciesCards = [
+    { key: 'dog', label: 'Dogs' },
+    { key: 'cat', label: 'Cats' },
+    { key: 'cow', label: 'Cows' },
+    { key: 'other', label: 'Other' },
+  ]
 
   if (loading) return <div style={{ padding: '16px' }}>Loading...</div>
 
@@ -285,33 +280,41 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main style={{ padding: '16px' }}>
-        {/* Section 1: Pie Chart */}
+        {/* Section 1: Species Summary */}
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ marginBottom: '16px' }}>Total Animals</h2>
-          <div style={{ width: '100%', height: '300px' }}>
-            {animalStats.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={animalStats}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {animalStats.map((entry) => (
-                      <Cell key={`cell-${entry.species}`} fill={COLORS[entry.species] || '#999'} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ textAlign: 'center', color: '#666' }}>No animal data yet</p>
-            )}
+          <h2 style={{ marginBottom: '16px' }}>Live Animal Count</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {speciesCards.map((card) => (
+              <div
+                key={card.key}
+                style={{
+                  background: '#F8F8F8',
+                  border: '2px solid #F5C800',
+                  borderRadius: '18px',
+                  padding: '18px 16px',
+                  minHeight: '120px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+                }}
+              >
+                <div>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1A1A1A' }}>
+                    {card.label}
+                  </p>
+                </div>
+                <div style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1, color: '#000000' }}>
+                  {speciesCounts[card.key]}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -384,46 +387,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Section 3: Navigation Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px',
-            marginBottom: '32px',
-          }}
-        >
-          {[
-            { label: 'OPD', href: '/opd' },
-            { label: 'IPD', href: '/ipd' },
-            { label: 'In-House', href: '/inhouse' },
-            { label: 'Daily Record', href: '/daily-tracking' },
-          ].map((card) => (
-            <a
-              key={card.label}
-              href={card.href}
-              style={{
-                background: '#F5F5F5',
-                borderRadius: '16px',
-                padding: '16px',
-                height: '160px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                textDecoration: 'none',
-                color: '#1A1A1A',
-                fontWeight: 700,
-                fontSize: '16px',
-                transition: 'all 0.3s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)')}
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-            >
-              {card.label}
-            </a>
-          ))}
-        </div>
       </main>
 
       {/* Floating Add Button */}

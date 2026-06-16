@@ -1,148 +1,115 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useContext, useState } from 'react'
-import { AuthContext } from '../AuthContext'
-import { supabase } from '../supabaseClient'
+import { Link, useLocation } from 'react-router-dom'
+
+const navItems = [
+  {
+    path: '/dashboard',
+    label: 'Home',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
+        <path d="M3 11.5L12 4l9 7.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6.5 10.8V20h11V10.8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9.2 20v-6.2h5.6V20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8.8 9.8h6.4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    path: '/opd',
+    label: 'OPD',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
+        <path d="M5 8h14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M7 8v10h10V8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M10 12h4M9 15h6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    path: '/ipd',
+    label: 'IPD',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
+        <path d="M4 19h16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M6.5 19V10l5.5-4 5.5 4v9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 13h2.2v-2.2h1.8V13H15v1.8h-2V17h-1.8v-2.2H9z" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    path: '/inhouse',
+    label: 'In-House',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
+        <path d="M4.5 11.5L12 5l7.5 6.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6.5 10.9V20h11V10.9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8.4 19.2v-5.4h3v5.4M12.6 19.2v-5.4h3v5.4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M10.8 14.4h2.4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    path: '/daily-tracking',
+    label: 'Daily Tracking',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
+        <rect x="4" y="5" width="16" height="15" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2.4" />
+        <path d="M8 3v4M16 3v4M4 9h16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 13h8M8 16h5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+]
 
 export default function BottomNav() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, role } = useContext(AuthContext)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setSidebarOpen(false)
-    navigate('/')
-  }
-
-  const navItems = [
-    { path: '/dashboard', icon: '🏠', label: 'Home' },
-    { path: '/opd', icon: '🏥', label: 'OPD' },
-    { path: '/daily-tracking', icon: '📋', label: 'Daily Record' },
-    { path: '/inhouse', icon: '🏢', label: 'In-House' },
-  ]
-
   return (
-    <>
-      {/* Sidebar Overlay */}
-      {sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 999 }} />
-      )}
-
-      {/* Sidebar */}
-      <div style={{
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: '250px',
-        backgroundColor: '#FFFFFF',
-        zIndex: 1001,
-        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.3s ease',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: sidebarOpen ? '0 0 10px rgba(0,0,0,0.2)' : 'none'
-      }}>
-        {/* Header */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '40px', height: '40px', backgroundColor: '#F5C800', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px' }}>🐾</div>
-          <div>
-            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px' }}>Saahas</p>
-            <p style={{ margin: 0, fontSize: '11px', color: '#666' }}>Shelter</p>
-          </div>
-        </div>
-
-        {/* Nav Links */}
-        <div style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
-          <Link to="/dashboard" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/dashboard') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/dashboard') ? '12px' : '16px', backgroundColor: isActive('/dashboard') ? '#F5F5F5' : 'transparent' }}>
-            Home
-          </Link>
-          <Link to="/opd" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/opd') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/opd') ? '12px' : '16px', backgroundColor: isActive('/opd') ? '#F5F5F5' : 'transparent' }}>
-            OPD
-          </Link>
-          <Link to="/ipd" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/ipd') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/ipd') ? '12px' : '16px', backgroundColor: isActive('/ipd') ? '#F5F5F5' : 'transparent' }}>
-            IPD
-          </Link>
-          <Link to="/inhouse" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/inhouse') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/inhouse') ? '12px' : '16px', backgroundColor: isActive('/inhouse') ? '#F5F5F5' : 'transparent' }}>
-            In-House
-          </Link>
-          <Link to="/daily-tracking" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/daily-tracking') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/daily-tracking') ? '12px' : '16px', backgroundColor: isActive('/daily-tracking') ? '#F5F5F5' : 'transparent' }}>
-            Daily Tracking
-          </Link>
-          <Link to="/register" onClick={() => setSidebarOpen(false)} style={{ display: 'block', padding: '12px 16px', textDecoration: 'none', color: '#1A1A1A', fontSize: '14px', borderLeft: isActive('/register') ? '4px solid #F5C800' : 'transparent', paddingLeft: isActive('/register') ? '12px' : '16px', backgroundColor: isActive('/register') ? '#F5F5F5' : 'transparent' }}>
-            New Registration
-          </Link>
-        </div>
-
-        {/* Footer */}
-        <div style={{ borderTop: '1px solid #E0E0E0', padding: '12px 16px' }}>
-          {user && (
-            <>
-              <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 'bold', color: '#1A1A1A' }}>{user.email || 'User'}</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#666' }}>Role: {role || 'staff'}</p>
-            </>
-          )}
-          <button onClick={handleLogout} style={{ width: '100%', padding: '10px', backgroundColor: '#EF4444', color: '#FFF', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom Navigation Bar */}
-      <nav style={{
+    <nav
+      style={{
         position: 'fixed',
         bottom: 0,
         left: 0,
         right: 0,
         backgroundColor: '#FFFFFF',
         borderTop: '1px solid #E0E0E0',
-        display: 'flex',
-        justifyContent: 'space-around',
-        padding: '8px 0',
-        zIndex: 100
-      }}>
-        {navItems.map(item => (
-          <Link key={item.path} to={item.path} onClick={() => setSidebarOpen(false)} style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px 8px',
-            textDecoration: 'none',
-            color: isActive(item.path) ? '#F5C800' : '#999',
-            fontSize: '11px',
-            gap: '4px',
-            transition: 'color 0.2s'
-          }}>
-            <span style={{ fontSize: '20px' }}>{item.icon}</span>
-            <span style={{ fontSize: '10px' }}>{item.label}</span>
-          </Link>
-        ))}
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        zIndex: 100,
+        boxShadow: '0 -6px 18px rgba(0,0,0,0.06)',
+      }}
+    >
+      {navItems.map((item) => {
+        const active = isActive(item.path)
 
-        {/* Menu Button */}
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '12px 8px',
-          background: 'none',
-          border: 'none',
-          color: sidebarOpen ? '#F5C800' : '#999',
-          fontSize: '11px',
-          gap: '4px',
-          cursor: 'pointer',
-          transition: 'color 0.2s'
-        }}>
-          <span style={{ fontSize: '20px' }}>☰</span>
-          <span style={{ fontSize: '10px' }}>Menu</span>
-        </button>
-      </nav>
-    </>
+        return (
+          <Link
+            key={item.path}
+            to={item.path}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              padding: '10px 6px 12px',
+              textDecoration: 'none',
+              color: '#111111',
+              backgroundColor: active ? '#FFF4BF' : '#FFFFFF',
+              minHeight: '76px',
+              transition: 'background-color 0.2s ease, transform 0.2s ease',
+            }}
+          >
+            <span style={{ color: '#111111', transform: active ? 'scale(1.05)' : 'scale(1)' }}>
+              {item.icon}
+            </span>
+            <span style={{ fontSize: '10px', lineHeight: 1.1, fontWeight: active ? 700 : 600, textAlign: 'center', color: '#111111' }}>
+              {item.label}
+            </span>
+          </Link>
+        )
+      })}
+    </nav>
   )
 }

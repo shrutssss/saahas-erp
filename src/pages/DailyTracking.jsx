@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import Navbar from '../components/Navbar'
-import BottomNav from '../components/BottomNav'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -49,7 +47,36 @@ export default function DailyTracking() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
-      <Navbar />
+      <div
+        style={{
+          backgroundColor: '#F5C800',
+          padding: '16px',
+          borderBottom: '1px solid #E0E0E0',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}
+      >
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+            color: '#000000',
+            padding: 0,
+            lineHeight: 1,
+          }}
+          aria-label="Go back"
+        >
+          ←
+        </button>
+        <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#000000' }}>
+          Daily Tracking
+        </h1>
+      </div>
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
         {/* Header */}
         <div style={{ padding: '16px', borderBottom: '1px solid #E0E0E0' }}>
@@ -136,7 +163,6 @@ export default function DailyTracking() {
           )}
         </div>
       </main>
-      <BottomNav />
     </div>
   )
 }

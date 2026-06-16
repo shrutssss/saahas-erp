@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useLocation } from 'react'
 import { supabase } from '../supabaseClient'
 import Navbar from '../components/Navbar'
-import BottomNav from '../components/BottomNav'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -211,7 +210,6 @@ export default function TreatmentSheet() {
         </div>
       )}
 
-      <BottomNav />
     </div>
   )
 }

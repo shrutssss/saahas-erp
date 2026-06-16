@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 
 export default function Registration() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const editAnimal = location.state?.animal || null
+  const isEditMode = Boolean(editAnimal)
   const [loading, setLoading] = useState(false)
+  const [notification, setNotification] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     species: 'dog',
     breed: '',
     gender: '',
-    years: 0,
-    months: 0,
+    years: '',
+    months: '',
     colour: '',
     rescue_date: '',
     admission_date: new Date().toISOString().split('T')[0],
@@ -26,14 +30,115 @@ export default function Registration() {
   const [photos, setPhotos] = useState([])
   const [photoPreviews, setPhotoPreviews] = useState([])
 
+  const buildAgeFields = (estimatedAgeMonths) => {
+    const ageMonths = Number.parseInt(estimatedAgeMonths, 10) || 0
+    return {
+      years: ageMonths >= 12 ? String(Math.floor(ageMonths / 12)) : '',
+      months: ageMonths % 12 ? String(ageMonths % 12) : '',
+    }
+  }
+
+  const speciesCodes = {
+    dog: 'DG',
+    cat: 'CT',
+    cow: 'CW',
+    other: 'OT',
+    pig: 'OT',
+  }
+
+  const genderCodes = {
+    male: 'M',
+    female: 'F',
+  }
+
+  const buildAnimalIdPrefix = (species, gender) => {
+    const speciesCode = speciesCodes[species?.toLowerCase()] || 'OT'
+    const genderCode = genderCodes[gender?.toLowerCase()] || ''
+    return genderCode ? `${speciesCode}-${genderCode}` : ''
+  }
+
+  const generateUniqueAnimalId = async (species, gender) => {
+    const prefix = buildAnimalIdPrefix(species, gender)
+    if (!prefix) return ''
+
+    const { data, error } = await supabase
+      .from('animals')
+      .select('animal_id')
+      .like('animal_id', `${prefix}-%`)
+
+    if (error) throw error
+
+    const highestSequence = (data || []).reduce((max, record) => {
+      const match = record.animal_id?.match(/-(\d{3})$/)
+      if (!match) return max
+      return Math.max(max, Number.parseInt(match[1], 10))
+    }, 0)
+
+    const nextSequence = String(highestSequence + 1).padStart(3, '0')
+    return `${prefix}-${nextSequence}`
+  }
+
   useEffect(() => {
-    // Generate animal ID on mount
-    const year = new Date().getFullYear()
-    const num = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, '0')
-    setAnimalId(`SAA-${year}-${num}`)
-  }, [])
+    if (!editAnimal) return
+
+    const { years, months } = buildAgeFields(editAnimal.estimated_age_months)
+    setFormData({
+      name: editAnimal.name || '',
+      species: editAnimal.species || 'dog',
+      breed: editAnimal.breed || '',
+      gender: editAnimal.gender || '',
+      years,
+      months,
+      colour: editAnimal.colour || '',
+      rescue_date: editAnimal.rescue_date || '',
+      admission_date: editAnimal.admission_date || new Date().toISOString().split('T')[0],
+      rescue_location: editAnimal.rescue_location || '',
+      ward: editAnimal.ward || '',
+      current_status: editAnimal.current_status || '',
+      category: editAnimal.category || 'normal',
+      initial_assessment: editAnimal.initial_assessment || '',
+    })
+    setAnimalId(editAnimal.animal_id || '')
+  }, [editAnimal])
+
+  useEffect(() => {
+    let isActive = true
+
+    const updateAnimalId = async () => {
+      if (!formData.species || !formData.gender) {
+        if (isEditMode && editAnimal?.animal_id) {
+          setAnimalId(editAnimal.animal_id)
+        } else {
+          setAnimalId('')
+        }
+        return
+      }
+
+      if (
+        isEditMode &&
+        editAnimal &&
+        formData.species === editAnimal.species &&
+        formData.gender === editAnimal.gender
+      ) {
+        if (isActive) setAnimalId(editAnimal.animal_id || '')
+        return
+      }
+
+      try {
+        const nextId = await generateUniqueAnimalId(formData.species, formData.gender)
+        if (isActive) setAnimalId(nextId)
+      } catch (error) {
+        console.error('Error generating animal ID:', error)
+        if (isActive) setAnimalId('')
+      }
+    }
+
+    updateAnimalId()
+
+    return () => {
+      isActive = false
+    }
+  }, [formData.species, formData.gender, editAnimal, isEditMode])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -64,39 +169,63 @@ export default function Registration() {
     setLoading(true)
 
     try {
-      // Insert animal into database
-      const { data: animal, error: animalError } = await supabase
-        .from('animals')
-        .insert([
-          {
-            animal_id: animalId,
-            name: formData.name,
-            species: formData.species,
-            breed: formData.breed,
-            gender: formData.gender,
-            estimated_age_months: formData.years * 12 + formData.months,
-            colour: formData.colour,
-            rescue_date: formData.rescue_date,
-            admission_date: formData.admission_date,
-            rescue_location: formData.rescue_location,
-            ward: formData.ward,
-            current_status: formData.current_status,
-            category: formData.category,
-            initial_assessment: formData.initial_assessment,
-          },
-        ])
-        .select()
+      let currentAnimalId = animalId
+      if (!currentAnimalId && formData.species && formData.gender) {
+        currentAnimalId = await generateUniqueAnimalId(formData.species, formData.gender)
+        setAnimalId(currentAnimalId)
+      }
 
-      if (animalError) throw animalError
+      if (!currentAnimalId) {
+        throw new Error('Animal ID could not be generated. Please select species and gender.')
+      }
 
-      const newAnimalId = animal[0].id
+      const animalPayload = {
+        animal_id: currentAnimalId,
+        name: formData.name,
+        species: formData.species,
+        breed: formData.breed,
+        gender: formData.gender,
+        estimated_age_months:
+          (Number.parseInt(formData.years, 10) || 0) * 12 +
+          (Number.parseInt(formData.months, 10) || 0),
+        colour: formData.colour,
+        rescue_date: formData.rescue_date,
+        admission_date: formData.admission_date,
+        rescue_location: formData.rescue_location,
+        ward: formData.ward,
+        current_status: formData.current_status,
+        category: formData.category,
+        initial_assessment: formData.initial_assessment,
+      }
+
+      let savedAnimalId = editAnimal?.id || null
+
+      if (isEditMode && editAnimal?.id) {
+        const { data: updatedAnimal, error: animalError } = await supabase
+          .from('animals')
+          .update(animalPayload)
+          .eq('id', editAnimal.id)
+          .select()
+          .single()
+
+        if (animalError) throw animalError
+        savedAnimalId = updatedAnimal.id
+      } else {
+        const { data: animal, error: animalError } = await supabase
+          .from('animals')
+          .insert([animalPayload])
+          .select()
+
+        if (animalError) throw animalError
+        savedAnimalId = animal[0].id
+      }
 
       // Upload photos if any
       if (photos.length > 0) {
         for (let i = 0; i < photos.length; i++) {
           const file = photos[i]
-          const fileName = `${animalId}-${Date.now()}-${i}.jpg`
-          const filePath = `${animalId}/${fileName}`
+          const fileName = `${currentAnimalId}-${Date.now()}-${i}.jpg`
+          const filePath = `${currentAnimalId}/${fileName}`
 
           const { data: photoData, error: uploadError } = await supabase.storage
             .from('animal-photos')
@@ -114,7 +243,7 @@ export default function Registration() {
             .from('animal_photos')
             .insert([
               {
-                animal_id: newAnimalId,
+                animal_id: savedAnimalId,
                 photo_url: urlData.publicUrl,
               },
             ])
@@ -122,17 +251,42 @@ export default function Registration() {
       }
 
       setLoading(false)
-      alert('Animal Registered Successfully')
-      navigate(`/animal/${newAnimalId}`)
+      setNotification({ type: 'success', message: isEditMode ? 'Animal updated successfully' : 'Animal registered successfully' })
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      navigate(`/animal/${savedAnimalId}`)
     } catch (error) {
       setLoading(false)
       console.error('Error registering animal:', error)
-      alert('Failed to register animal: ' + error.message)
+      setNotification({ type: 'error', message: `Failed to save animal: ${error.message}` })
     }
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF' }}>
+      {notification && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            backgroundColor: notification.type === 'success' ? '#DCFCE7' : '#FEE2E2',
+            color: notification.type === 'success' ? '#166534' : '#991B1B',
+            border: `1px solid ${notification.type === 'success' ? '#22C55E' : '#EF4444'}`,
+            borderRadius: '12px',
+            padding: '12px 16px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+            maxWidth: 'calc(100vw - 32px)',
+            width: 'fit-content',
+            fontSize: '14px',
+            fontWeight: 600,
+          }}
+        >
+          {notification.message}
+        </div>
+      )}
+
       {/* Top Bar */}
       <div
         style={{
@@ -155,7 +309,7 @@ export default function Registration() {
           ←
         </button>
         <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1, textAlign: 'center' }}>
-          Add New Animal
+          {isEditMode ? 'Edit Animal' : 'Add New Animal'}
         </h1>
       </div>
 
@@ -191,6 +345,7 @@ export default function Registration() {
             type="text"
             value={animalId}
             disabled
+            placeholder="Select species and gender to generate ID"
             style={{
               width: '100%',
               padding: '12px',
@@ -224,7 +379,6 @@ export default function Registration() {
             <option value="dog">Dog</option>
             <option value="cat">Cat</option>
             <option value="cow">Cow</option>
-            <option value="pig">Pig</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -589,7 +743,7 @@ export default function Registration() {
             opacity: loading ? 0.7 : 1,
           }}
         >
-          {loading ? 'Registering Animal...' : 'Register Animal'}
+          {loading ? (isEditMode ? 'Updating Animal...' : 'Registering Animal...') : (isEditMode ? 'Update Animal' : 'Register Animal')}
         </button>
       </form>
     </div>

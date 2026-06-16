@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useContext, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { AuthContext } from './AuthContext'
+import BottomNav from './components/BottomNav'
 
 import Login from './pages/Login'
 import Registration from './pages/Registration'
@@ -11,7 +12,7 @@ import AnimalProfile from './pages/AnimalProfile'
 import DailyTracking from './pages/DailyTracking'
 import TreatmentSheet from './pages/TreatmentSheet'
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute() {
   const [isAuthed, setIsAuthed] = useState(null)
 
   useEffect(() => {
@@ -25,7 +26,16 @@ function ProtectedRoute({ children }) {
   if (isAuthed === null) return <div style={{ padding: '16px' }}>Loading...</div>
   if (!isAuthed) return <Navigate to="/" replace />
 
-  return children
+  return <Outlet />
+}
+
+function ProtectedLayout() {
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+      <Outlet />
+      <BottomNav />
+    </div>
+  )
 }
 
 export default function App() {
@@ -36,70 +46,18 @@ export default function App() {
         <Route path="/" element={<Login />} />
 
         {/* Protected */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <ProtectedRoute>
-              <Registration />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/opd"
-          element={
-            <ProtectedRoute>
-              <AnimalList ward="opd" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ipd"
-          element={
-            <ProtectedRoute>
-              <AnimalList ward="ipd" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inhouse"
-          element={
-            <ProtectedRoute>
-              <AnimalList ward="inhouse" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/animal/:id"
-          element={
-            <ProtectedRoute>
-              <AnimalProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/daily-tracking"
-          element={
-            <ProtectedRoute>
-              <DailyTracking />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/treatment/:id"
-          element={
-            <ProtectedRoute>
-              <TreatmentSheet />
-            </ProtectedRoute>
-          }
-        />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/register" element={<Registration />} />
+            <Route path="/opd" element={<AnimalList ward="opd" />} />
+            <Route path="/ipd" element={<AnimalList ward="ipd" />} />
+            <Route path="/inhouse" element={<AnimalList ward="inhouse" />} />
+            <Route path="/animal/:id" element={<AnimalProfile />} />
+            <Route path="/daily-tracking" element={<DailyTracking />} />
+            <Route path="/treatment/:id" element={<TreatmentSheet />} />
+          </Route>
+        </Route>
       </Routes>
     </BrowserRouter>
   )
