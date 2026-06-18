@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import SaahasLogo from '../components/SaahasLogo'
 
 export default function DailyTracking() {
   const navigate = useNavigate()
@@ -182,20 +183,23 @@ export default function DailyTracking() {
       {/* TOP BAR */}
       <div
         style={{
-          backgroundColor: '#F5C800',
+          backgroundColor: '#FFFFFF',
           padding: '16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+          borderBottom: '1px solid #E0E0E0',
         }}
       >
-        <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#000000' }}>
-          Daily Tracking
-        </h1>
-        <span style={{ fontSize: '14px', color: '#000000', fontWeight: '600' }}>
-          {formatDateDisplay(todayString)}
-        </span>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#000000' }}>
+            Daily Tracking
+          </h1>
+          <span style={{ fontSize: '14px', color: '#000000', fontWeight: '600' }}>
+            {formatDateDisplay(selectedDate)}
+          </span>
+        </div>
+        <SaahasLogo size={44} />
       </div>
 
       {/* DATE STRIP */}

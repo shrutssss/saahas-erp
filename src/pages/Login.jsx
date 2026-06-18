@@ -1,7 +1,7 @@
-import { useState, useContext } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { AuthContext } from '../AuthContext'
+import SaahasLogo, { brandFont } from '../components/SaahasLogo'
 
 export default function Login() {
   const [name, setName] = useState('')
@@ -34,15 +34,9 @@ export default function Login() {
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
       <div style={{ width: '100%', maxWidth: '375px', textAlign: 'center' }}>
-        <div style={{ width: 100, height: 100, borderRadius: 50, background: '#F5C800', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-hidden>
-          {/* Simple dog silhouette */}
-          <svg width="60" height="60" viewBox="0 0 24 24" fill="#000000" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <path d="M5 10c-.5-1 0-2 1-3s2-1 3-1 2 0 3 1 2 1 3 1 2 0 2 1-1 1-2 2-2 2-3 2-2 0-3-1-2-2-3-2-1 0-2-1-1-1-1-1z" />
-            <path d="M3 17c0 1.7 3 3 6 3s6-1.3 6-3v-1H3v1z" />
-          </svg>
-        </div>
+        <SaahasLogo size={165} style={{ margin: '0 auto' }} />
 
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginTop: 16, marginBottom: 24 }}>Saahas</h1>
+        <h1 style={{ fontFamily: brandFont, fontSize: 28, fontWeight: 700, marginTop: 16, marginBottom: 24 }}>Saahas</h1>
 
         <form onSubmit={handleLogin} style={{ textAlign: 'left' }}>
           <label style={{ display: 'block', marginBottom: 8, fontSize: 14 }}>Enter Name:</label>

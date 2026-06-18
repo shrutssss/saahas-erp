@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
-import Navbar from '../components/Navbar'
+import SaahasLogo, { brandFont } from '../components/SaahasLogo'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -169,12 +169,36 @@ export default function AnimalProfile() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
-      <Navbar />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          padding: '16px',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E0E0E0',
+        }}
+      >
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+          }}
+        >
+          ←
+        </button>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, fontFamily: brandFont, flex: 1 }}>
+          Saahas
+        </h1>
+        <SaahasLogo size={44} />
+      </div>
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
         {/* Top Section */}
         <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', position: 'relative' }}>
-          <button onClick={() => navigate('/dashboard')} style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>←</button>
-          
           {role && (role === 'admin' || role === 'doctor') && (
             <button
               onClick={() => navigate('/register', { state: { animal } })}
@@ -185,7 +209,7 @@ export default function AnimalProfile() {
             </button>
           )}
 
-          <div style={{ marginTop: '32px', display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
             {/* Photo Carousel */}
             {photos.length > 0 ? (
               <div style={{ position: 'relative' }}>

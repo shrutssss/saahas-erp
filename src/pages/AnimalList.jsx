@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import SaahasLogo from '../components/SaahasLogo'
 
 export default function AnimalList({ ward = 'opd' }) {
   const navigate = useNavigate()
@@ -119,9 +120,10 @@ export default function AnimalList({ ward = 'opd' }) {
         style={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '16px',
           padding: '16px',
-          background: '#F5C800',
+          background: '#FFFFFF',
           borderBottom: '1px solid #E0E0E0',
         }}
       >
@@ -139,6 +141,7 @@ export default function AnimalList({ ward = 'opd' }) {
         <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1 }}>
           {wardTitle} Animals
         </h1>
+        <SaahasLogo size={44} />
       </div>
 
       {/* Content */}

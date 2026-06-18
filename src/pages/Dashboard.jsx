@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import SaahasLogo, { brandFont } from '../components/SaahasLogo'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -109,6 +110,11 @@ export default function Dashboard() {
     }
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    navigate('/')
+  }
+
   const renderCell = (activity, species) => {
     const key = `${activity.toLowerCase().replace(/\s+/g, '_')}_${species.toLowerCase()}`
     const value = monthlyStats[key] || 0
@@ -175,8 +181,8 @@ export default function Dashboard() {
         >
           ☰
         </button>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700 }}>Saahas</h1>
-        <div style={{ width: '24px' }} />
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, fontFamily: brandFont }}>Saahas</h1>
+        <SaahasLogo size={44} />
       </div>
 
       {/* Sidebar Menu */}
@@ -203,11 +209,13 @@ export default function Dashboard() {
               background: '#FFFFFF',
               padding: '16px',
               overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2>Menu</h2>
-            <ul style={{ listStyle: 'none', padding: 0 }}>
+            <ul style={{ listStyle: 'none', padding: 0, flex: 1 }}>
               <li style={{ marginBottom: '12px' }}>
                 <a
                   href="/dashboard"
@@ -274,6 +282,23 @@ export default function Dashboard() {
                 </a>
               </li>
             </ul>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                background: '#F5C800',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '14px',
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginTop: '16px',
+              }}
+            >
+              Logout
+            </button>
           </div>
         </div>
       )}
