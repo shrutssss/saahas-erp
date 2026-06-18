@@ -20,7 +20,8 @@ create table animals (
   admission_date date,
   rescue_location text,
   current_status text check (current_status in ('critical','moderate','stable','recovered','deceased')),
-  category text check (category in ('normal','paralysed','blind','neurological','behavioural','senior','disabled')),
+  category text check (category in ('normal','paralysed','blind','neurological','behavioural','senior','disabled','chemo')),
+  lss_incharge text,
   ward text check (ward in ('opd','ipd','inhouse')),
   initial_assessment text,
   is_active boolean default true,
@@ -48,6 +49,8 @@ create table observation_logs (
   food_given text,
   activity_level text,
   additional_notes text,
+  reporter text,
+  initial_medical_assessment text,
   updated_by uuid references profiles(id),
   created_at timestamp default now()
 );

@@ -18,11 +18,10 @@ export default function Registration() {
     months: '',
     colour: '',
     rescue_date: '',
-    admission_date: new Date().toISOString().split('T')[0],
     rescue_location: '',
     ward: '',
-    current_status: '',
     category: 'normal',
+    lss_incharge: '',
     initial_assessment: '',
   })
 
@@ -91,11 +90,10 @@ export default function Registration() {
       months,
       colour: editAnimal.colour || '',
       rescue_date: editAnimal.rescue_date || '',
-      admission_date: editAnimal.admission_date || new Date().toISOString().split('T')[0],
       rescue_location: editAnimal.rescue_location || '',
       ward: editAnimal.ward || '',
-      current_status: editAnimal.current_status || '',
       category: editAnimal.category || 'normal',
+      lss_incharge: editAnimal.lss_incharge || '',
       initial_assessment: editAnimal.initial_assessment || '',
     })
     setAnimalId(editAnimal.animal_id || '')
@@ -190,11 +188,10 @@ export default function Registration() {
           (Number.parseInt(formData.months, 10) || 0),
         colour: formData.colour,
         rescue_date: formData.rescue_date,
-        admission_date: formData.admission_date,
         rescue_location: formData.rescue_location,
         ward: formData.ward,
-        current_status: formData.current_status,
         category: formData.category,
+        lss_incharge: formData.lss_incharge,
         initial_assessment: formData.initial_assessment,
       }
 
@@ -515,28 +512,7 @@ export default function Registration() {
           />
         </div>
 
-        {/* 9. Admission Date */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Admission Date *
-          </label>
-          <input
-            type="date"
-            name="admission_date"
-            value={formData.admission_date}
-            onChange={handleInputChange}
-            required
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #E0E0E0',
-              borderRadius: '12px',
-              fontSize: '14px',
-            }}
-          />
-        </div>
-
-        {/* 10. Rescue Location */}
+        {/* 9. Rescue Location */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
             Rescue Location
@@ -585,43 +561,7 @@ export default function Registration() {
           </div>
         </div>
 
-        {/* 12. Current Status */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Current Status *
-          </label>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {['critical', 'moderate', 'stable'].map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, current_status: status }))}
-                style={{
-                  flex: '1 1 auto',
-                  minWidth: '90px',
-                  padding: '12px',
-                  borderRadius: 50,
-                  border: 'none',
-                  background:
-                    formData.current_status === status
-                      ? status === 'critical'
-                        ? '#EF4444'
-                        : status === 'moderate'
-                          ? '#F97316'
-                          : '#22C55E'
-                      : '#F0F0F0',
-                  color: formData.current_status === status ? '#FFF' : '#666',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 13. Category */}
+        {/* 12. Category */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
             Category *
@@ -646,7 +586,29 @@ export default function Registration() {
             <option value="behavioural">Behavioural Problems</option>
             <option value="senior">Senior Care</option>
             <option value="disabled">Disabled</option>
+            <option value="chemo">Chemo</option>
           </select>
+        </div>
+
+        {/* 13. LSS Incharge */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+            LSS Incharge
+          </label>
+          <input
+            type="text"
+            name="lss_incharge"
+            value={formData.lss_incharge}
+            onChange={handleInputChange}
+            placeholder="Enter name"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #E0E0E0',
+              borderRadius: '12px',
+              fontSize: '14px',
+            }}
+          />
         </div>
 
         {/* 14. Initial Medical Assessment */}

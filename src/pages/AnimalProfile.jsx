@@ -23,7 +23,8 @@ const getCategoryLabel = (cat) => {
     'neurological': 'Neurological',
     'behavioural': 'Behavioral',
     'senior': 'Senior Care',
-    'disabled': 'Disabled'
+    'disabled': 'Disabled',
+    'chemo': 'Chemo',
   }
   return labels[cat] || cat
 }
@@ -32,6 +33,97 @@ const getWardLabel = (ward) => {
   const labels = { 'opd': 'OPD', 'ipd': 'IPD', 'inhouse': 'In-House' }
   return labels[ward] || ward
 }
+
+const OBS_META_PREFIX = '<!--OBS:'
+
+const encodeObservationNotes = (reporter, initialMedicalAssessment, additionalNotes) => {
+  const reporterValue = reporter?.trim() || ''
+  const assessmentValue = initialMedicalAssessment?.trim() || ''
+  const notesValue = additionalNotes?.trim() || ''
+
+  if (!reporterValue && !assessmentValue) {
+    return notesValue || null
+  }
+
+  const meta = JSON.stringify({
+    reporter: reporterValue,
+    initial_medical_assessment: assessmentValue,
+  })
+  return `${OBS_META_PREFIX}${meta}-->${notesValue ? `\n${notesValue}` : ''}`
+}
+
+const getObservationDisplayFields = (obs) => {
+  const reporter = obs.reporter?.trim() || ''
+  const initialMedicalAssessment = obs.initial_medical_assessment?.trim() || ''
+  let additionalNotes = obs.additional_notes || ''
+
+  if (reporter || initialMedicalAssessment) {
+    return { reporter, initialMedicalAssessment, additionalNotes }
+  }
+
+  if (!additionalNotes.startsWith(OBS_META_PREFIX)) {
+    return { reporter: '', initialMedicalAssessment: '', additionalNotes }
+  }
+
+  const metaEnd = additionalNotes.indexOf('-->')
+  if (metaEnd === -1) {
+    return { reporter: '', initialMedicalAssessment: '', additionalNotes }
+  }
+
+  try {
+    const meta = JSON.parse(additionalNotes.slice(OBS_META_PREFIX.length, metaEnd))
+    const cleanNotes = additionalNotes.slice(metaEnd + 3).replace(/^\n/, '')
+    return {
+      reporter: meta.reporter?.trim() || '',
+      initialMedicalAssessment: meta.initial_medical_assessment?.trim() || '',
+      additionalNotes: cleanNotes,
+    }
+  } catch {
+    return { reporter: '', initialMedicalAssessment: '', additionalNotes }
+  }
+}
+
+const isMissingObservationColumnError = (error) => {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    message.includes('reporter') ||
+    message.includes('initial_medical_assessment') ||
+    message.includes('schema cache')
+  )
+}
+
+const buildObservationPayload = (animalId, obsForm, updatedBy = null) => {
+  const payload = {
+    animal_id: animalId,
+    weight: obsForm.weight ? parseFloat(obsForm.weight) : null,
+    temperature: obsForm.temperature ? parseFloat(obsForm.temperature) : null,
+    vomiting: obsForm.vomiting,
+    eating_status: obsForm.eating_status,
+    loose_motion: obsForm.loose_motion,
+    food_given: obsForm.food_given.trim() || null,
+    activity_level: obsForm.activity_level,
+    additional_notes: obsForm.additional_notes.trim() || null,
+  }
+
+  if (updatedBy) {
+    payload.updated_by = updatedBy
+  }
+
+  return payload
+}
+
+const emptyObsForm = () => ({
+  reporter: '',
+  initial_medical_assessment: '',
+  weight: '',
+  temperature: '',
+  vomiting: false,
+  eating_status: 'eating_well',
+  loose_motion: false,
+  food_given: '',
+  activity_level: 'normal',
+  additional_notes: '',
+})
 
 export default function AnimalProfile() {
   const { id } = useParams()
@@ -52,8 +144,12 @@ export default function AnimalProfile() {
 
   const [statusUpdate, setStatusUpdate] = useState('')
   const [statusLoading, setStatusLoading] = useState(false)
+  const [obsSaving, setObsSaving] = useState(false)
+  const [notification, setNotification] = useState(null)
 
   const [obsForm, setObsForm] = useState({
+    reporter: '',
+    initial_medical_assessment: '',
     weight: '',
     temperature: '',
     vomiting: false,
@@ -85,10 +181,15 @@ export default function AnimalProfile() {
 
       if (animalRes.data) {
         setAnimal(animalRes.data)
-        setStatusUpdate(animalRes.data.current_status)
+        const status = animalRes.data.current_status
+        setStatusUpdate(['recovered', 'deceased'].includes(status) ? status : '')
       }
       if (photosRes.data) setPhotos(photosRes.data)
-      if (obsRes.data) setObservations(obsRes.data)
+      if (obsRes.error) {
+        console.error('Error fetching observations:', obsRes.error)
+      } else if (obsRes.data) {
+        setObservations(obsRes.data)
+      }
       if (treatRes.data) setTreatments(treatRes.data)
     } catch (err) {
       console.error('Error fetching animal data:', err)
@@ -112,34 +213,80 @@ export default function AnimalProfile() {
 
   const handleAddObservation = async (e) => {
     e.preventDefault()
+    setObsSaving(true)
+    setNotification(null)
+
+    const finishSave = (savedObs) => {
+      setObservations((prev) => [savedObs, ...prev])
+      setShowObsForm(false)
+      setActiveTab('medical')
+      setObsForm(emptyObsForm())
+      setNotification({ type: 'success', message: 'Observation saved successfully' })
+      setTimeout(() => setNotification(null), 3000)
+    }
+
     try {
       const { data: userData } = await supabase.auth.getUser()
-      await supabase.from('observation_logs').insert({
-        animal_id: id,
-        weight: obsForm.weight ? parseFloat(obsForm.weight) : null,
-        temperature: obsForm.temperature ? parseFloat(obsForm.temperature) : null,
-        vomiting: obsForm.vomiting,
-        eating_status: obsForm.eating_status,
-        loose_motion: obsForm.loose_motion,
-        food_given: obsForm.food_given,
-        activity_level: obsForm.activity_level,
-        additional_notes: obsForm.additional_notes,
-        updated_by: userData.user.id
-      })
-      setShowObsForm(false)
-      setObsForm({
-        weight: '',
-        temperature: '',
-        vomiting: false,
-        eating_status: 'eating_well',
-        loose_motion: false,
-        food_given: '',
-        activity_level: 'normal',
-        additional_notes: ''
-      })
-      await fetchData()
+      let updatedBy = null
+
+      if (userData?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userData.user.id)
+          .maybeSingle()
+        if (profile?.id) {
+          updatedBy = profile.id
+        }
+      }
+
+      const payloadWithColumns = {
+        ...buildObservationPayload(id, obsForm, updatedBy),
+        reporter: obsForm.reporter.trim() || null,
+        initial_medical_assessment: obsForm.initial_medical_assessment.trim() || null,
+      }
+
+      const { data: savedObs, error } = await supabase
+        .from('observation_logs')
+        .insert(payloadWithColumns)
+        .select('*')
+        .single()
+
+      if (!error) {
+        finishSave(savedObs)
+        return
+      }
+
+      if (!isMissingObservationColumnError(error)) {
+        throw error
+      }
+
+      const fallbackPayload = {
+        ...buildObservationPayload(id, obsForm, updatedBy),
+        additional_notes: encodeObservationNotes(
+          obsForm.reporter,
+          obsForm.initial_medical_assessment,
+          obsForm.additional_notes
+        ),
+      }
+
+      const { data: fallbackObs, error: fallbackError } = await supabase
+        .from('observation_logs')
+        .insert(fallbackPayload)
+        .select('*')
+        .single()
+
+      if (fallbackError) throw fallbackError
+
+      finishSave(fallbackObs)
     } catch (err) {
       console.error('Error adding observation:', err)
+      setNotification({
+        type: 'error',
+        message: `Failed to save observation: ${err.message}`,
+      })
+    } finally {
+      setObsSaving(false)
     }
   }
 
@@ -169,6 +316,29 @@ export default function AnimalProfile() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+      {notification && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            backgroundColor: notification.type === 'success' ? '#DCFCE7' : '#FEE2E2',
+            color: notification.type === 'success' ? '#166534' : '#991B1B',
+            border: `1px solid ${notification.type === 'success' ? '#22C55E' : '#EF4444'}`,
+            borderRadius: '12px',
+            padding: '12px 16px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+            maxWidth: 'calc(100vw - 32px)',
+            width: 'fit-content',
+            fontSize: '14px',
+            fontWeight: 600,
+          }}
+        >
+          {notification.message}
+        </div>
+      )}
       <div
         style={{
           display: 'flex',
@@ -246,7 +416,7 @@ export default function AnimalProfile() {
         <div style={{ display: 'flex', borderBottom: '2px solid #E0E0E0', backgroundColor: '#FFFFFF', position: 'sticky', top: '0', zIndex: 10 }}>
           {['details', 'medical', 'treatment'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '12px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: activeTab === tab ? 'bold' : 'normal', borderBottom: activeTab === tab ? '3px solid #F5C800' : 'none', color: activeTab === tab ? '#F5C800' : '#666' }}>
-              {tab === 'details' ? 'Details' : tab === 'medical' ? 'Medical History' : 'Treatment'}
+              {tab === 'details' ? 'Observation' : tab === 'medical' ? 'Medical History' : 'Treatment'}
             </button>
           ))}
         </div>
@@ -287,6 +457,11 @@ export default function AnimalProfile() {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>LSS Incharge</label>
+                <p style={{ margin: '0', fontSize: '14px', color: '#1A1A1A' }}>{animal.lss_incharge || '—'}</p>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Initial Assessment</label>
                 <p style={{ margin: '0', fontSize: '14px', color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>{animal.initial_assessment || '—'}</p>
               </div>
@@ -295,9 +470,7 @@ export default function AnimalProfile() {
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Update Status</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select value={statusUpdate} onChange={(e) => setStatusUpdate(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px' }}>
-                    <option value="critical">Critical</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="stable">Stable</option>
+                    <option value="">Select status</option>
                     <option value="recovered">Recovered</option>
                     <option value="deceased">Deceased</option>
                   </select>
@@ -316,9 +489,19 @@ export default function AnimalProfile() {
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>No observations yet</p>
               ) : (
                 <div style={{ marginBottom: '16px' }}>
-                  {observations.map(obs => (
+                  {observations.map(obs => {
+                    const { reporter, initialMedicalAssessment, additionalNotes } = getObservationDisplayFields(obs)
+                    return (
                     <div key={obs.id} style={{ marginBottom: '16px', borderLeft: '4px solid #F5C800', paddingLeft: '12px' }}>
-                      <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 'bold', color: '#F5C800' }}>{obs.log_date}</p>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '8px', alignItems: 'baseline' }}>
+                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#F5C800' }}>{obs.log_date}</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                          <strong>Reporter:</strong> {reporter || '—'}
+                        </p>
+                      </div>
+                      <p style={{ margin: '4px 0 8px 0', fontSize: '13px', whiteSpace: 'pre-wrap' }}>
+                        <strong>Initial Medical Assessment:</strong> {initialMedicalAssessment || '—'}
+                      </p>
                       {obs.weight && <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Weight:</strong> {obs.weight} kg</p>}
                       {obs.temperature && <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Temp:</strong> {obs.temperature}°C</p>}
                       <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Eating:</strong> {obs.eating_status}</p>
@@ -326,9 +509,10 @@ export default function AnimalProfile() {
                       {obs.vomiting && <p style={{ margin: '4px 0', fontSize: '13px', color: '#EF4444' }}><strong>Vomiting: Yes</strong></p>}
                       {obs.loose_motion && <p style={{ margin: '4px 0', fontSize: '13px', color: '#EF4444' }}><strong>Loose Motion: Yes</strong></p>}
                       {obs.food_given && <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Food:</strong> {obs.food_given}</p>}
-                      {obs.additional_notes && <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Notes:</strong> {obs.additional_notes}</p>}
+                      {additionalNotes && <p style={{ margin: '4px 0', fontSize: '13px' }}><strong>Notes:</strong> {additionalNotes}</p>}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
               <button onClick={() => setShowObsForm(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', color: '#000' }}>+ Add Observation</button>
@@ -385,6 +569,16 @@ export default function AnimalProfile() {
 
           <form onSubmit={handleAddObservation}>
             <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reporter</label>
+              <input type="text" placeholder="Enter reporter name" value={obsForm.reporter} onChange={(e) => setObsForm({ ...obsForm, reporter: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Initial Medical Assessment</label>
+              <textarea placeholder="Enter initial medical assessment" value={obsForm.initial_medical_assessment} onChange={(e) => setObsForm({ ...obsForm, initial_medical_assessment: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Weight (kg)</label>
               <input type="number" step="0.1" value={obsForm.weight} onChange={(e) => setObsForm({ ...obsForm, weight: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box' }} />
             </div>
@@ -433,7 +627,7 @@ export default function AnimalProfile() {
               <textarea value={obsForm.additional_notes} onChange={(e) => setObsForm({ ...obsForm, additional_notes: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E0E0E0', fontSize: '14px', boxSizing: 'border-box', minHeight: '80px', fontFamily: 'inherit' }} />
             </div>
 
-            <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', color: '#000' }}>Save Observation</button>
+            <button type="submit" disabled={obsSaving} style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: obsSaving ? 'not-allowed' : 'pointer', color: '#000', opacity: obsSaving ? 0.7 : 1 }}>{obsSaving ? 'Saving...' : 'Save Observation'}</button>
           </form>
         </div>
       )}
