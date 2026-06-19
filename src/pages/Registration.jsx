@@ -23,6 +23,7 @@ export default function Registration() {
     category: 'normal',
     lss_incharge: '',
     initial_assessment: '',
+    reason_for_admission: '',
   })
 
   const [animalId, setAnimalId] = useState('')
@@ -95,6 +96,7 @@ export default function Registration() {
       category: editAnimal.category || 'normal',
       lss_incharge: editAnimal.lss_incharge || '',
       initial_assessment: editAnimal.initial_assessment || '',
+      reason_for_admission: editAnimal.reason_for_admission || '',
     })
     setAnimalId(editAnimal.animal_id || '')
   }, [editAnimal])
@@ -193,6 +195,7 @@ export default function Registration() {
         category: formData.category,
         lss_incharge: formData.lss_incharge,
         initial_assessment: formData.initial_assessment,
+        reason_for_admission: formData.reason_for_admission,
       }
 
       let savedAnimalId = editAnimal?.id || null
@@ -611,15 +614,38 @@ export default function Registration() {
           />
         </div>
 
-        {/* 14. Initial Medical Assessment */}
+        {/* Reason for Admission */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Initial Medical Assessment
+            Reason for Admission
+          </label>
+          <input
+            type="text"
+            name="reason_for_admission"
+            value={formData.reason_for_admission}
+            onChange={handleInputChange}
+            placeholder="e.g., Road accident"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #E0E0E0',
+              borderRadius: '12px',
+              fontSize: '14px',
+              color: '#1A1A1A',
+            }}
+          />
+        </div>
+
+        {/* 14. Current Condition */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+            Current Condition
           </label>
           <textarea
             name="initial_assessment"
             value={formData.initial_assessment}
             onChange={handleInputChange}
+            placeholder="e.g., Weight: 12 kg, Temp: 101°F, abdominal wound, weak but alert"
             rows="4"
             style={{
               width: '100%',
@@ -628,6 +654,7 @@ export default function Registration() {
               borderRadius: '12px',
               fontSize: '14px',
               fontFamily: 'inherit',
+              color: '#1A1A1A',
             }}
           />
         </div>

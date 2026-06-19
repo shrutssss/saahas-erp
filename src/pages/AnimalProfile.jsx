@@ -146,6 +146,8 @@ export default function AnimalProfile() {
   const [statusLoading, setStatusLoading] = useState(false)
   const [obsSaving, setObsSaving] = useState(false)
   const [notification, setNotification] = useState(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const [obsForm, setObsForm] = useState({
     reporter: '',
@@ -307,6 +309,79 @@ export default function AnimalProfile() {
     }
   }
 
+  const handleDeleteAnimal = async () => {
+    setDeleteLoading(true)
+    setNotification(null)
+    try {
+      // 1. Delete treatment entries
+      const { error: treatmentError } = await supabase
+        .from('treatment_entries')
+        .delete()
+        .eq('animal_id', id)
+      if (treatmentError) throw treatmentError
+
+      // 2. Delete observation logs
+      const { error: observationError } = await supabase
+        .from('observation_logs')
+        .delete()
+        .eq('animal_id', id)
+      if (observationError) throw observationError
+
+      // 3. Delete photo references from database
+      const { error: photosError } = await supabase
+        .from('animal_photos')
+        .delete()
+        .eq('animal_id', id)
+      if (photosError) throw photosError
+
+      // 4. Delete photos files from storage bucket
+      try {
+        if (animal?.animal_id) {
+          const { data: fileList, error: listError } = await supabase.storage
+            .from('animal-photos')
+            .list(animal.animal_id)
+
+          if (!listError && fileList && fileList.length > 0) {
+            const filesToRemove = fileList.map((file) => `${animal.animal_id}/${file.name}`)
+            const { error: removeError } = await supabase.storage
+              .from('animal-photos')
+              .remove(filesToRemove)
+            if (removeError) {
+              console.warn('Storage files removal error (non-fatal):', removeError)
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.error('Non-blocking storage cleanup error:', storageErr)
+      }
+
+      // 5. Delete animal profile from animals table
+      const { error: animalError } = await supabase
+        .from('animals')
+        .delete()
+        .eq('id', id)
+      if (animalError) throw animalError
+
+      setNotification({ type: 'success', message: 'Animal deleted successfully' })
+      setShowDeleteModal(false)
+
+      // Wait a moment for notification toast
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Navigate back to the corresponding ward list page
+      const wardUrl = animal.ward === 'opd' ? '/opd' : animal.ward === 'ipd' ? '/ipd' : animal.ward === 'inhouse' ? '/inhouse' : '/dashboard'
+      navigate(wardUrl, { replace: true })
+    } catch (err) {
+      console.error('Error deleting animal:', err)
+      setNotification({
+        type: 'error',
+        message: `Failed to delete animal: ${err.message}`,
+      })
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   if (loading) return <div style={{ padding: '16px' }}>Loading...</div>
   if (!animal) return <div style={{ padding: '16px' }}>Animal not found</div>
 
@@ -370,13 +445,27 @@ export default function AnimalProfile() {
         {/* Top Section */}
         <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', position: 'relative' }}>
           {role && (role === 'admin' || role === 'doctor') && (
-            <button
-              onClick={() => navigate('/register', { state: { animal } })}
-              style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}
-              aria-label="Edit animal"
-            >
-              ✎
-            </button>
+            <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <button
+                onClick={() => navigate('/register', { state: { animal } })}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                aria-label="Edit animal"
+              >
+                ✎
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                aria-label="Delete animal"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
           )}
 
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -462,7 +551,12 @@ export default function AnimalProfile() {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Initial Assessment</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reason for Admission</label>
+                <p style={{ margin: '0', fontSize: '14px', color: '#1A1A1A' }}>{animal.reason_for_admission || '—'}</p>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Current Condition</label>
                 <p style={{ margin: '0', fontSize: '14px', color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>{animal.initial_assessment || '—'}</p>
               </div>
 
@@ -659,6 +753,90 @@ export default function AnimalProfile() {
 
             <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#F5C800', border: 'none', borderRadius: '50px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', color: '#000' }}>Save Medicine</button>
           </form>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          onClick={() => !deleteLoading && setShowDeleteModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '400px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            <div style={{ fontSize: '48px', margin: '0 auto' }}>⚠️</div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1A1A1A' }}>
+              Delete Animal Profile?
+            </h3>
+            <p style={{ margin: 0, fontSize: '14px', color: '#666666', lineHeight: '1.5' }}>
+              Are you sure you want to permanently delete <strong>{animal?.name}</strong>? This action cannot be undone and will remove all database records, treatment history, observation logs, and photos.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '50px',
+                  border: '1px solid #E0E0E0',
+                  backgroundColor: '#FFFFFF',
+                  color: '#666666',
+                  fontWeight: 'bold',
+                  cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAnimal}
+                disabled={deleteLoading}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '50px',
+                  border: 'none',
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 'bold',
+                  cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  opacity: deleteLoading ? 0.7 : 1,
+                }}
+              >
+                {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
