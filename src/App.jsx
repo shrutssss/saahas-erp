@@ -9,7 +9,7 @@ import Registration from './pages/Registration'
 import Dashboard from './pages/Dashboard'
 import AnimalList from './pages/AnimalList'
 import AnimalProfile from './pages/AnimalProfile'
-import DailyTracking from './pages/DailyTracking'
+import Tracking from './pages/Tracking'
 import TreatmentSheet from './pages/TreatmentSheet'
 
 function ProtectedRoute() {
@@ -54,7 +54,7 @@ export default function App() {
             <Route path="/ipd" element={<AnimalList ward="ipd" />} />
             <Route path="/inhouse" element={<AnimalList ward="inhouse" />} />
             <Route path="/animal/:id" element={<AnimalProfile />} />
-            <Route path="/daily-tracking" element={<DailyTracking />} />
+            <Route path="/tracking" element={<Tracking />} />
             <Route path="/treatment/:id" element={<TreatmentSheet />} />
           </Route>
         </Route>

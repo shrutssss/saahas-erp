@@ -163,7 +163,28 @@ export default function AnimalProfile() {
 
   const [showMedicalForm, setShowMedicalForm] = useState(false)
   const [showTreatmentSheetForm, setShowTreatmentSheetForm] = useState(false)
-  const [showReportForm, setShowReportForm] = useState(false)
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [showRequestTreatmentForm, setShowRequestTreatmentForm] = useState(false);
+  const [requestSaving, setRequestSaving] = useState(false)
+
+  const [activeHealthTag, setActiveHealthTag] = useState(null)
+  const [showHealthFormModal, setShowHealthFormModal] = useState(false)
+  const [showHealthViewModal, setShowHealthViewModal] = useState(false)
+  const [showHealthDeleteModal, setShowHealthDeleteModal] = useState(false)
+  const [healthForm, setHealthForm] = useState({
+    status: '',
+    date: todayString(),
+    medicineName: '',
+    reporterName: '',
+  })
+
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
+  const [recoveryPhotoForm, setRecoveryPhotoForm] = useState({
+    file: null,
+    previewUrl: ''
+  })
+  const recoveryUploadRef = useRef(null)
+  const recoveryCameraRef = useRef(null)
 
   const [statusUpdate, setStatusUpdate] = useState('')
   const [statusLoading, setStatusLoading] = useState(false)
@@ -199,6 +220,103 @@ export default function AnimalProfile() {
   const reportUploadRef = useRef(null)
   const reportCameraRef = useRef(null)
 
+  const getHealthTagConfig = (key) => {
+    const configs = {
+      vaccinated: { label: 'Vaccinated', fieldLabel: 'Vaccine/Dose Name' },
+      rabies: { label: 'Rabies Vaccine', fieldLabel: 'Vaccine/Dose Name' },
+      dewormed: { label: 'Dewormed', fieldLabel: 'Deworming Medicine Name' },
+      sterilized: { label: 'Sterilized', fieldLabel: null },
+    }
+    return configs[key] || {}
+  }
+
+  const handleHealthTagClick = (tagKey) => {
+    const healthInfo = animal.health_info || {}
+    const existing = healthInfo[tagKey]
+    
+    if (existing && existing.status === 'Yes') {
+      setActiveHealthTag(tagKey)
+      setShowHealthViewModal(true)
+    } else {
+      setActiveHealthTag(tagKey)
+      setHealthForm({
+        status: existing?.status || '',
+        date: todayString(),
+        medicineName: '',
+        reporterName: ''
+      })
+      setShowHealthFormModal(true)
+    }
+  }
+
+  const handleSaveHealthInfo = async (e) => {
+    e.preventDefault()
+    if (!healthForm.status) {
+      showToast('error', 'Status is required')
+      return
+    }
+
+    if (healthForm.status === 'Yes') {
+      if (!healthForm.date || !healthForm.reporterName) {
+        showToast('error', 'Date and Reporter Name are required when status is Yes')
+        return
+      }
+      const config = getHealthTagConfig(activeHealthTag)
+      if (config.fieldLabel && !healthForm.medicineName) {
+        showToast('error', `${config.fieldLabel} is required`)
+        return
+      }
+    }
+
+    const newInfo = { ...healthForm }
+    if (newInfo.status === 'No') {
+      delete newInfo.date
+      delete newInfo.medicineName
+      delete newInfo.reporterName
+    }
+
+    const updatedHealthInfo = { ...(animal.health_info || {}), [activeHealthTag]: newInfo }
+    
+    try {
+      await supabase.from('animals').update({ health_info: updatedHealthInfo }).eq('id', id)
+      setAnimal({ ...animal, health_info: updatedHealthInfo })
+      setShowHealthFormModal(false)
+      setShowHealthViewModal(false)
+      showToast('success', `${getHealthTagConfig(activeHealthTag)?.label} status updated`)
+    } catch (err) {
+      console.error('Error updating health status:', err)
+      showToast('error', 'Failed to update health status')
+    }
+  }
+
+  const handleDeleteHealthInfo = async () => {
+    const updatedHealthInfo = { ...(animal.health_info || {}) }
+    delete updatedHealthInfo[activeHealthTag]
+    
+    try {
+      await supabase.from('animals').update({ health_info: updatedHealthInfo }).eq('id', id)
+      setAnimal({ ...animal, health_info: updatedHealthInfo })
+      setShowHealthDeleteModal(false)
+      setShowHealthViewModal(false)
+      showToast('success', `${getHealthTagConfig(activeHealthTag)?.label} record deleted`)
+    } catch (err) {
+      console.error('Error deleting health status:', err)
+      showToast('error', 'Failed to delete health record')
+    }
+  }
+
+  const handleEditHealthInfo = () => {
+    const existing = animal.health_info?.[activeHealthTag] || {}
+    setHealthForm({
+      status: existing.status || 'Yes',
+      date: existing.date || todayString(),
+      medicineName: existing.medicineName || '',
+      reporterName: existing.reporterName || ''
+    })
+    setShowHealthViewModal(false)
+    setShowHealthFormModal(true)
+  }
+
   useEffect(() => {
     fetchData()
   }, [id])
@@ -207,8 +325,9 @@ export default function AnimalProfile() {
     return () => {
       if (treatmentSheetForm.previewUrl) URL.revokeObjectURL(treatmentSheetForm.previewUrl)
       if (reportForm.previewUrl) URL.revokeObjectURL(reportForm.previewUrl)
+      if (recoveryPhotoForm.previewUrl) URL.revokeObjectURL(recoveryPhotoForm.previewUrl)
     }
-  }, [treatmentSheetForm.previewUrl, reportForm.previewUrl])
+  }, [treatmentSheetForm.previewUrl, reportForm.previewUrl, recoveryPhotoForm.previewUrl])
 
   const showToast = (type, message) => {
     setNotification({ type, message })
@@ -258,12 +377,54 @@ export default function AnimalProfile() {
 
   const handleStatusUpdate = async () => {
     if (!statusUpdate) return
+    if (statusUpdate === 'recovered') {
+      setShowRecoveryModal(true)
+      return
+    }
+
     setStatusLoading(true)
     try {
       await supabase.from('animals').update({ current_status: statusUpdate }).eq('id', id)
       setAnimal({ ...animal, current_status: statusUpdate })
+      showToast('success', 'Status updated successfully')
     } catch (err) {
       console.error('Error updating status:', err)
+      showToast('error', 'Failed to update status')
+    } finally {
+      setStatusLoading(false)
+    }
+  }
+
+  const handleRecoveryPhotoFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (recoveryPhotoForm.previewUrl) URL.revokeObjectURL(recoveryPhotoForm.previewUrl)
+    setRecoveryPhotoForm({ file, previewUrl: URL.createObjectURL(file) })
+    e.target.value = ''
+  }
+
+  const handleSaveRecovery = async (e) => {
+    e.preventDefault()
+    if (!recoveryPhotoForm.file) {
+      showToast('error', 'Please upload or take a recovery photo')
+      return
+    }
+
+    setStatusLoading(true)
+    try {
+      const imageUrl = await uploadImage(recoveryPhotoForm.file, 'recovery-photos')
+      
+      await supabase.from('animals').update({ 
+        current_status: 'recovered',
+        recovery_photo_url: imageUrl
+      }).eq('id', id)
+      
+      setAnimal({ ...animal, current_status: 'recovered', recovery_photo_url: imageUrl })
+      setShowRecoveryModal(false)
+      showToast('success', 'Animal marked as recovered with photo')
+    } catch (err) {
+      console.error('Error saving recovery:', err)
+      showToast('error', `Failed to save recovery: ${err.message}`)
     } finally {
       setStatusLoading(false)
     }
@@ -299,9 +460,26 @@ export default function AnimalProfile() {
       console.error('Error adding medical record:', err)
       showToast('error', `Failed to save medical record: ${err.message}`)
     } finally {
-      setMedicalSaving(false)
+      setMedicalSaving(false);
+  }
+}
+
+  const handleRequestTreatment = async () => {
+    setRequestSaving(true);
+    try {
+      await supabase.from('animals').update({ requires_vet_attention: true }).eq('id', id);
+      setAnimal((prev) => ({ ...prev, requires_vet_attention: true }));
+      showToast('success', 'Treatment request submitted');
+      setShowRequestTreatmentForm(false);
+    } catch (err) {
+      console.error('Error requesting treatment:', err);
+      showToast('error', `Failed to request treatment: ${err.message}`);
+    } finally {
+      setRequestSaving(false);
     }
   }
+
+
 
   const handleTreatmentSheetFile = (e) => {
     const file = e.target.files?.[0]
@@ -550,45 +728,70 @@ export default function AnimalProfile() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {photos.length > 0 ? (
-              <div style={{ position: 'relative' }}>
-                <div
-                  style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
-                  onClick={() => {
-                    setSelectedPhoto(photos[0])
-                    setShowPhotoModal(true)
-                  }}
-                >
-                  <img src={photos[0].photo_url} alt={animal.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                {photos.length > 1 && (
-                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px', overflowX: 'auto', scrollBehavior: 'smooth' }}>
-                    {photos.slice(1, 4).map((p, i) => (
-                      <img
-                        key={i}
-                        src={p.photo_url}
-                        alt=""
-                        onClick={() => {
-                          setSelectedPhoto(p)
-                          setShowPhotoModal(true)
-                        }}
-                        style={{ width: '40px', height: '40px', borderRadius: '4px', cursor: 'pointer', objectFit: 'cover' }}
-                      />
-                    ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ flex: 1, minWidth: '140px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>Before</label>
+                {photos.length > 0 ? (
+                  <div
+                    style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedPhoto(photos[0])
+                      setShowPhotoModal(true)
+                    }}
+                  >
+                    <img src={photos[0].photo_url} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                    🐾
                   </div>
                 )}
               </div>
-            ) : (
-              <div style={{ width: '80px', height: '80px', borderRadius: '8px', backgroundColor: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
-                🐾
+              <div style={{ flex: 1, minWidth: '140px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>After</label>
+                {animal.recovery_photo_url ? (
+                  <div
+                    style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedPhoto({ photo_url: animal.recovery_photo_url })
+                      setShowPhotoModal(true)
+                    }}
+                  >
+                    <img src={animal.recovery_photo_url} alt="After" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => setShowRecoveryModal(true)}
+                    style={{ cursor: 'pointer', width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F8F8F8', border: '1px dashed #D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#999', textAlign: 'center', padding: '8px' }}
+                  >
+                    + Add After<br/>Photo
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {photos.length > 1 && (
+              <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', scrollBehavior: 'smooth' }}>
+                {photos.slice(1, 4).map((p, i) => (
+                  <img
+                    key={i}
+                    src={p.photo_url}
+                    alt=""
+                    onClick={() => {
+                      setSelectedPhoto(p)
+                      setShowPhotoModal(true)
+                    }}
+                    style={{ width: '40px', height: '40px', borderRadius: '4px', cursor: 'pointer', objectFit: 'cover' }}
+                  />
+                ))}
               </div>
             )}
 
-            <div style={{ flex: 1 }}>
+            <div>
               <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</h2>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#666' }}>{animal.animal_id}</p>
-              <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#666' }}>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>{animal.animal_id}</p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
                 {animal.species} • {animal.breed}
               </p>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -607,6 +810,34 @@ export default function AnimalProfile() {
                   {animal.current_status}
                 </span>
                 <span style={{ display: 'inline-block', backgroundColor: '#E0E0E0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{getWardLabel(animal.ward)}</span>
+              </div>
+              
+              <hr style={{ border: 'none', borderTop: '1px solid #E0E0E0', margin: '16px 0' }} />
+              
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map(tagKey => {
+                  const info = animal.health_info?.[tagKey]
+                  const isYes = info?.status === 'Yes'
+                  const config = getHealthTagConfig(tagKey)
+                  return (
+                    <span
+                      key={tagKey}
+                      onClick={() => handleHealthTagClick(tagKey)}
+                      style={{
+                        display: 'inline-block',
+                        backgroundColor: isYes ? '#22C55E' : '#F0F0F0',
+                        color: isYes ? '#FFFFFF' : '#666',
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: isYes ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {config.label}
+                    </span>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -703,9 +934,22 @@ export default function AnimalProfile() {
 
           {activeTab === 'medical' && (
             <div>
-              <button onClick={() => setShowMedicalForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                + Add Medical Record
-              </button>
+              <button onClick={() => setShowMedicalForm(true)} style={{ ...primaryButtonStyle, marginBottom: '8px' }}>
+                  + Add Medical Record
+                </button>
+                <button onClick={() => setShowRequestTreatmentForm(true)} style={{ ...primaryButtonStyle, backgroundColor: '#F5C800', marginBottom: '16px' }}>
+                  Request Treatment
+                </button>
+                {showRequestTreatmentForm && (
+                  <BottomSheet title="Request Treatment" onClose={() => !requestSaving && setShowRequestTreatmentForm(false)}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <p>Confirm you want to request veterinary attention for this animal?</p>
+                    </div>
+                    <button type="button" onClick={handleRequestTreatment} disabled={requestSaving} style={{ ...primaryButtonStyle, backgroundColor: '#F5C800' }}>
+                      {requestSaving ? 'Requesting...' : 'Confirm Request'}
+                    </button>
+                  </BottomSheet>
+                )}
               {medicalRecords.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No medical records yet</p>
               ) : (
@@ -1015,6 +1259,226 @@ export default function AnimalProfile() {
             </div>
           </div>
         </div>
+      )}
+
+      {showHealthFormModal && (
+        <BottomSheet
+          title={`Update ${getHealthTagConfig(activeHealthTag)?.label}`}
+          onClose={() => setShowHealthFormModal(false)}
+        >
+          <form onSubmit={handleSaveHealthInfo}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Status</label>
+              <select
+                value={healthForm.status}
+                onChange={(e) => setHealthForm({ ...healthForm, status: e.target.value })}
+                style={sheetInputStyle}
+                required
+              >
+                <option value="">Select status</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            {healthForm.status === 'Yes' && (
+              <>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={healthForm.date}
+                    onChange={(e) => setHealthForm({ ...healthForm, date: e.target.value })}
+                    style={sheetInputStyle}
+                  />
+                </div>
+                {getHealthTagConfig(activeHealthTag)?.fieldLabel && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>{getHealthTagConfig(activeHealthTag).fieldLabel}</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={`Enter ${getHealthTagConfig(activeHealthTag).fieldLabel.toLowerCase()}`}
+                      value={healthForm.medicineName}
+                      onChange={(e) => setHealthForm({ ...healthForm, medicineName: e.target.value })}
+                      style={sheetInputStyle}
+                    />
+                  </div>
+                )}
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reporter Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter reporter name"
+                    value={healthForm.reporterName}
+                    onChange={(e) => setHealthForm({ ...healthForm, reporterName: e.target.value })}
+                    style={sheetInputStyle}
+                  />
+                </div>
+              </>
+            )}
+            <button type="submit" style={primaryButtonStyle}>
+              Save
+            </button>
+          </form>
+        </BottomSheet>
+      )}
+
+      {showHealthViewModal && (
+        <BottomSheet
+          title={`${getHealthTagConfig(activeHealthTag)?.label} Details`}
+          onClose={() => setShowHealthViewModal(false)}
+        >
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginBottom: '16px' }}>
+              <button
+                onClick={handleEditHealthInfo}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                aria-label="Edit"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button
+                onClick={() => setShowHealthDeleteModal(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                aria-label="Delete"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Status</label>
+              <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.health_info?.[activeHealthTag]?.status}</p>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
+              <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{formatDisplayDate(animal.health_info?.[activeHealthTag]?.date)}</p>
+            </div>
+            {getHealthTagConfig(activeHealthTag)?.fieldLabel && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>{getHealthTagConfig(activeHealthTag).fieldLabel}</label>
+                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.health_info?.[activeHealthTag]?.medicineName}</p>
+              </div>
+            )}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reporter Name</label>
+              <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.health_info?.[activeHealthTag]?.reporterName}</p>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {showHealthDeleteModal && (
+        <div
+          onClick={() => setShowHealthDeleteModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '400px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            <div style={{ fontSize: '48px', margin: '0 auto' }}>⚠️</div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1A1A1A' }}>Delete Record?</h3>
+            <p style={{ margin: 0, fontSize: '14px', color: '#666666', lineHeight: '1.5' }}>
+              Are you sure you want to delete this {getHealthTagConfig(activeHealthTag)?.label} record?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setShowHealthDeleteModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '50px',
+                  border: '1px solid #E0E0E0',
+                  backgroundColor: '#FFFFFF',
+                  color: '#666666',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteHealthInfo}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '50px',
+                  border: 'none',
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRecoveryModal && (
+        <BottomSheet
+          title="Recovered - Add After Photo"
+          onClose={() => {
+            if (!statusLoading) {
+              if (recoveryPhotoForm.previewUrl) URL.revokeObjectURL(recoveryPhotoForm.previewUrl)
+              setRecoveryPhotoForm({ file: null, previewUrl: '' })
+              setShowRecoveryModal(false)
+              setStatusUpdate(animal.current_status)
+            }
+          }}
+        >
+          <form onSubmit={handleSaveRecovery}>
+            <PhotoUploadField
+              previewUrl={recoveryPhotoForm.previewUrl}
+              onFileSelect={handleRecoveryPhotoFile}
+              uploadInputRef={recoveryUploadRef}
+              cameraInputRef={recoveryCameraRef}
+            />
+            <button type="submit" disabled={statusLoading} style={{ ...primaryButtonStyle, opacity: statusLoading ? 0.7 : 1 }}>
+              {statusLoading ? 'Saving...' : 'Save Recovery'}
+            </button>
+          </form>
+        </BottomSheet>
       )}
     </div>
   )

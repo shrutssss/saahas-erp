@@ -1,4 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
+
+
 
 const navItems = [
   {
@@ -48,8 +52,8 @@ const navItems = [
     ),
   },
   {
-    path: '/daily-tracking',
-    label: 'Daily Tracking',
+    path: '/tracking',
+    label: 'Tracking',
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 30, height: 30, display: 'block' }}>
         <rect x="4" y="5" width="16" height="15" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2.4" />
@@ -62,6 +66,32 @@ const navItems = [
 
 export default function BottomNav() {
   const location = useLocation()
+  const [trackingCount, setTrackingCount] = useState(0)
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from('animals')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .eq('requires_vet_attention', true)
+      
+      setTrackingCount(count || 0)
+    }
+    
+    fetchCount()
+    
+    const channel = supabase
+      .channel('animals_tracking_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'animals' }, () => {
+        fetchCount()
+      })
+      .subscribe()
+      
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
 
@@ -101,8 +131,29 @@ export default function BottomNav() {
               transition: 'background-color 0.2s ease, transform 0.2s ease',
             }}
           >
-            <span style={{ color: '#111111', transform: active ? 'scale(1.05)' : 'scale(1)' }}>
+            <span style={{ position: 'relative', color: '#111111', transform: active ? 'scale(1.05)' : 'scale(1)' }}>
               {item.icon}
+              {item.path === '/tracking' && trackingCount > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: '#EF4444',
+                  color: 'white',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  height: '18px',
+                  minWidth: '18px',
+                  borderRadius: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 4px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }}>
+                  {trackingCount}
+                </div>
+              )}
             </span>
             <span style={{ fontSize: '10px', lineHeight: 1.1, fontWeight: active ? 700 : 600, textAlign: 'center', color: '#111111' }}>
               {item.label}
