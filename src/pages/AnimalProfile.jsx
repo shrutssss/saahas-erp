@@ -225,7 +225,7 @@ export default function AnimalProfile() {
       vaccinated: { label: 'Vaccinated', fieldLabel: 'Vaccine/Dose Name' },
       rabies: { label: 'Rabies Vaccine', fieldLabel: 'Vaccine/Dose Name' },
       dewormed: { label: 'Dewormed', fieldLabel: 'Deworming Medicine Name' },
-      sterilized: { label: 'Sterilized', fieldLabel: null },
+      sterilized: { label: 'Neutered/Spayed', fieldLabel: null },
     }
     return configs[key] || {}
   }
@@ -363,16 +363,26 @@ export default function AnimalProfile() {
     }
   }
 
-  const uploadImage = async (file, folder) => {
-    const ext = file.name.split('.').pop() || 'jpg'
-    const fileName = `${folder}-${Date.now()}.${ext}`
-    const filePath = `${animal.animal_id}/${folder}/${fileName}`
+  const CLOUDINARY_CLOUD_NAME = 'dtixpptzy'
+  const CLOUDINARY_UPLOAD_PRESET = 'saahas_unsigned'
 
-    const { error: uploadError } = await supabase.storage.from('animal-photos').upload(filePath, file)
-    if (uploadError) throw uploadError
-
-    const { data: urlData } = supabase.storage.from('animal-photos').getPublicUrl(filePath)
-    return urlData.publicUrl
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
+    
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    )
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(`Cloudinary upload failed: ${errorData.error?.message}`)
+    }
+    
+    const data = await response.json()
+    return data.secure_url
   }
 
   const handleStatusUpdate = async () => {
@@ -412,7 +422,7 @@ export default function AnimalProfile() {
 
     setStatusLoading(true)
     try {
-      const imageUrl = await uploadImage(recoveryPhotoForm.file, 'recovery-photos')
+      const imageUrl = await uploadToCloudinary(recoveryPhotoForm.file)
       
       await supabase.from('animals').update({ 
         current_status: 'recovered',
@@ -506,7 +516,7 @@ export default function AnimalProfile() {
 
     setTreatmentSheetSaving(true)
     try {
-      const imageUrl = await uploadImage(treatmentSheetForm.file, 'treatment-sheets')
+      const imageUrl = await uploadToCloudinary(treatmentSheetForm.file)
       const { data, error } = await supabase
         .from('treatment_sheets')
         .insert({
@@ -561,7 +571,7 @@ export default function AnimalProfile() {
 
     setReportSaving(true)
     try {
-      const imageUrl = await uploadImage(reportForm.file, 'reports')
+      const imageUrl = await uploadToCloudinary(reportForm.file)
       const { data, error } = await supabase
         .from('animal_reports')
         .insert({
@@ -606,22 +616,7 @@ export default function AnimalProfile() {
       await supabase.from('observation_logs').delete().eq('animal_id', id)
       await supabase.from('animal_photos').delete().eq('animal_id', id)
 
-      try {
-        if (animal?.animal_id) {
-          const { data: fileList } = await supabase.storage.from('animal-photos').list(animal.animal_id)
-          if (fileList?.length > 0) {
-            const filesToRemove = fileList.flatMap((item) => {
-              if (item.id === null) {
-                return [`${animal.animal_id}/${item.name}`]
-              }
-              return [`${animal.animal_id}/${item.name}`]
-            })
-            await supabase.storage.from('animal-photos').remove(filesToRemove)
-          }
-        }
-      } catch (storageErr) {
-        console.warn('Non-blocking storage cleanup error:', storageErr)
-      }
+
 
       const { error: animalError } = await supabase.from('animals').delete().eq('id', id)
       if (animalError) throw animalError
@@ -731,7 +726,7 @@ export default function AnimalProfile() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ flex: 1, minWidth: '140px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>Before</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>On admission</label>
                 {photos.length > 0 ? (
                   <div
                     style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
@@ -740,7 +735,7 @@ export default function AnimalProfile() {
                       setShowPhotoModal(true)
                     }}
                   >
-                    <img src={photos[0].photo_url} alt="Before" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={photos[0].photo_url} alt="On admission" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                 ) : (
                   <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
@@ -749,7 +744,7 @@ export default function AnimalProfile() {
                 )}
               </div>
               <div style={{ flex: 1, minWidth: '140px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>After</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>On Release</label>
                 {animal.recovery_photo_url ? (
                   <div
                     style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
@@ -758,14 +753,14 @@ export default function AnimalProfile() {
                       setShowPhotoModal(true)
                     }}
                   >
-                    <img src={animal.recovery_photo_url} alt="After" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={animal.recovery_photo_url} alt="On Release" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                 ) : (
                   <div
                     onClick={() => setShowRecoveryModal(true)}
                     style={{ cursor: 'pointer', width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F8F8F8', border: '1px dashed #D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#999', textAlign: 'center', padding: '8px' }}
                   >
-                    + Add After<br/>Photo
+                    + Add On Release<br/>Photo
                   </div>
                 )}
               </div>
@@ -817,24 +812,28 @@ export default function AnimalProfile() {
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map(tagKey => {
                   const info = animal.health_info?.[tagKey]
-                  const isYes = info?.status === 'Yes'
                   const config = getHealthTagConfig(tagKey)
+                  const isDone = config.fieldLabel === null 
+                    ? (info?.status === 'Yes')
+                    : (info?.status === 'Yes' && !!info?.medicineName && info.medicineName.trim() !== '')
+
                   return (
                     <span
                       key={tagKey}
                       onClick={() => handleHealthTagClick(tagKey)}
                       style={{
                         display: 'inline-block',
-                        backgroundColor: isYes ? '#22C55E' : '#F0F0F0',
-                        color: isYes ? '#FFFFFF' : '#666',
+                        backgroundColor: '#F5F5F5',
+                        border: isDone ? '2px solid #22C55E' : '2px solid #EF4444',
+                        color: '#1A1A1A',
                         padding: '4px 8px',
-                        borderRadius: '12px',
+                        borderRadius: '50px',
                         fontSize: '12px',
-                        fontWeight: isYes ? 'bold' : 'normal',
+                        fontWeight: 600,
                         cursor: 'pointer',
                       }}
                     >
-                      {config.label}
+                      {isDone ? '✓ ' : '✗ '}{config.label}
                     </span>
                   )
                 })}

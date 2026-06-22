@@ -29,6 +29,8 @@ export default function Registration() {
   const [animalId, setAnimalId] = useState('')
   const [photos, setPhotos] = useState([])
   const [photoPreviews, setPhotoPreviews] = useState([])
+  const [nameSuggestion, setNameSuggestion] = useState('')
+  const [showNameWarning, setShowNameWarning] = useState(false)
 
   const buildAgeFields = (estimatedAgeMonths) => {
     const ageMonths = Number.parseInt(estimatedAgeMonths, 10) || 0
@@ -140,9 +142,75 @@ export default function Registration() {
     }
   }, [formData.species, formData.gender, editAnimal, isEditMode])
 
+  useEffect(() => {
+    const enteredName = formData.name?.trim()
+    if (!enteredName) {
+      setShowNameWarning(false)
+      setNameSuggestion('')
+      return
+    }
+
+    if (isEditMode && editAnimal && editAnimal.name && editAnimal.name.toLowerCase() === enteredName.toLowerCase()) {
+      setShowNameWarning(false)
+      setNameSuggestion('')
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data: existingNames } = await supabase
+          .from('animals')
+          .select('name')
+          .ilike('name', `${enteredName}%`)
+
+        const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^${escapeRegExp(enteredName)}(\\d*)$`, 'i')
+        
+        let maxSuffix = 1
+        let hasExactMatch = false
+
+        if (existingNames) {
+          for (const item of existingNames) {
+            if (!item.name) continue
+            const match = item.name.match(regex)
+            if (match) {
+              const suffixStr = match[1]
+              if (suffixStr === '') {
+                hasExactMatch = true
+              } else {
+                const suffixNum = parseInt(suffixStr, 10)
+                if (!isNaN(suffixNum) && suffixNum > maxSuffix) {
+                  maxSuffix = suffixNum
+                }
+              }
+            }
+          }
+        }
+
+        if (hasExactMatch) {
+          const suggestion = `${enteredName}${maxSuffix + 1}`
+          setNameSuggestion(suggestion)
+          setShowNameWarning(true)
+        } else {
+          setShowNameWarning(false)
+          setNameSuggestion('')
+        }
+      } catch (err) {
+        console.error('Error checking duplicate name:', err)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [formData.name, isEditMode, editAnimal])
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleUseSuggestion = () => {
+    setFormData((prev) => ({ ...prev, name: nameSuggestion }))
+    setShowNameWarning(false)
   }
 
   const handlePhotoChange = (e) => {
@@ -162,6 +230,28 @@ export default function Registration() {
   const removePhoto = (index) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index))
     setPhotoPreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const CLOUDINARY_CLOUD_NAME = 'dtixpptzy'
+  const CLOUDINARY_UPLOAD_PRESET = 'saahas_unsigned'
+
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
+    
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    )
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(`Cloudinary upload failed: ${errorData.error?.message}`)
+    }
+    
+    const data = await response.json()
+    return data.secure_url
   }
 
   const handleSubmit = async (e) => {
@@ -222,38 +312,19 @@ export default function Registration() {
 
       // Upload photos if any
       if (photos.length > 0) {
-        for (let i = 0; i < photos.length; i++) {
-          const file = photos[i]
-          const fileName = `${currentAnimalId}-${Date.now()}-${i}.jpg`
-          const filePath = `${currentAnimalId}/${fileName}`
-
-          const { data: photoData, error: uploadError } = await supabase.storage
-            .from('animal-photos')
-            .upload(filePath, file)
-
-          if (uploadError) throw uploadError
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('animal-photos')
-            .getPublicUrl(filePath)
-
-          // Insert photo record
-          await supabase
-            .from('animal_photos')
-            .insert([
-              {
-                animal_id: savedAnimalId,
-                photo_url: urlData.publicUrl,
-              },
-            ])
+        for (const photo of photos) {
+          const photoUrl = await uploadToCloudinary(photo)
+          await supabase.from('animal_photos').insert({
+            animal_id: savedAnimalId,
+            photo_url: photoUrl
+          })
         }
       }
 
       setLoading(false)
       setNotification({ type: 'success', message: isEditMode ? 'Animal updated successfully' : 'Animal registered successfully' })
       await new Promise((resolve) => setTimeout(resolve, 1200))
-      navigate(`/animal/${savedAnimalId}`)
+      navigate(`/animal/${savedAnimalId}`, { replace: true })
     } catch (error) {
       setLoading(false)
       console.error('Error registering animal:', error)
@@ -334,6 +405,43 @@ export default function Registration() {
               fontSize: '14px',
             }}
           />
+          {showNameWarning && nameSuggestion && (
+            <div
+              style={{
+                background: '#FFF9E6',
+                border: '1px solid #F5C800',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '13px',
+                color: '#1A1A1A',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+              }}
+            >
+              <span>
+                ⚠️ '{formData.name}' already exists. Try: {nameSuggestion}
+              </span>
+              <button
+                type="button"
+                onClick={handleUseSuggestion}
+                style={{
+                  background: '#F5C800',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#000',
+                  cursor: 'pointer',
+                }}
+              >
+                Use {nameSuggestion}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 2. Animal ID */}
