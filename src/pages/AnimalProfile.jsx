@@ -824,7 +824,6 @@ export default function AnimalProfile() {
                       style={{
                         display: 'inline-block',
                         backgroundColor: '#F5F5F5',
-                        border: isDone ? '2px solid #22C55E' : '2px solid #EF4444',
                         color: '#1A1A1A',
                         padding: '4px 8px',
                         borderRadius: '50px',
