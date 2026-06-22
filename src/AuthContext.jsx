@@ -37,7 +37,10 @@ export function AuthProvider({ children }) {
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      if (session?.user) {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setRole(null)
+      } else if (session) {
         setUser(session.user)
         try {
           const { data: profile } = await supabase
@@ -49,9 +52,6 @@ export function AuthProvider({ children }) {
         } catch (e) {
           console.error('Failed to fetch user role:', e)
         }
-      } else {
-        setUser(null)
-        setRole(null)
       }
     })
 

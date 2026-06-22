@@ -112,7 +112,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   const renderCell = (activity, species) => {

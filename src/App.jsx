@@ -13,18 +13,10 @@ import Tracking from './pages/Tracking'
 import TreatmentSheet from './pages/TreatmentSheet'
 
 function ProtectedRoute() {
-  const [isAuthed, setIsAuthed] = useState(null)
+  const { user, loading } = useContext(AuthContext)
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession()
-      setIsAuthed(!!data?.session?.user)
-    }
-    checkAuth()
-  }, [])
-
-  if (isAuthed === null) return <div style={{ padding: '16px' }}>Loading...</div>
-  if (!isAuthed) return <Navigate to="/" replace />
+  if (loading) return <div style={{ padding: '16px' }}>Loading...</div>
+  if (!user) return <Navigate to="/" replace />
 
   return <Outlet />
 }

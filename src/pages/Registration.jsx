@@ -145,15 +145,19 @@ export default function Registration() {
   useEffect(() => {
     const enteredName = formData.name?.trim()
     if (!enteredName) {
-      setShowNameWarning(false)
-      setNameSuggestion('')
-      return
+      const clearTimer = setTimeout(() => {
+        setShowNameWarning(false)
+        setNameSuggestion('')
+      }, 0)
+      return () => clearTimeout(clearTimer)
     }
 
     if (isEditMode && editAnimal && editAnimal.name && editAnimal.name.toLowerCase() === enteredName.toLowerCase()) {
-      setShowNameWarning(false)
-      setNameSuggestion('')
-      return
+      const clearTimer = setTimeout(() => {
+        setShowNameWarning(false)
+        setNameSuggestion('')
+      }, 0)
+      return () => clearTimeout(clearTimer)
     }
 
     const timer = setTimeout(async () => {
