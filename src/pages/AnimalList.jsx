@@ -15,7 +15,7 @@ export default function AnimalList({ ward = 'opd' }) {
 
   const wardTitle = ward === 'opd' ? 'OPD' : ward === 'ipd' ? 'IPD' : 'In-House'
   const conditions = ward === 'opd'
-    ? ['Recovered', 'Critical']
+    ? []
     : ['Recovered', 'Paralyzed', 'Blind', 'Neurological', 'Behavioral', 'Critical']
 
   useEffect(() => {

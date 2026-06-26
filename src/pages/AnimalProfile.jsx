@@ -942,10 +942,12 @@ export default function AnimalProfile() {
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Colour / Marks</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.colour || '—'}</p>
               </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
-              </div>
+              {animal.ward && animal.ward.toLowerCase() !== 'opd' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>LSS Incharge</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.lss_incharge || '—'}</p>
