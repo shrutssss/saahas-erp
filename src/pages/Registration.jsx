@@ -20,10 +20,15 @@ export default function Registration() {
     rescue_date: '',
     rescue_location: '',
     ward: '',
-    category: 'normal',
+    category: '',
     lss_incharge: '',
     initial_assessment: '',
     reason_for_admission: '',
+    rescuer_type: '', // New field
+    reporter_name: '', // Conditional fields
+    reporter_address: '',
+    reporter_phone: '',
+    reporter_aadhaar_url: ''
   })
 
   const [animalId, setAnimalId] = useState('')
@@ -95,7 +100,7 @@ export default function Registration() {
       rescue_date: editAnimal.rescue_date || '',
       rescue_location: editAnimal.rescue_location || '',
       ward: editAnimal.ward || '',
-      category: editAnimal.category || 'normal',
+      category: editAnimal.category || '',
       lss_incharge: editAnimal.lss_incharge || '',
       initial_assessment: editAnimal.initial_assessment || '',
       reason_for_admission: editAnimal.reason_for_admission || '',
@@ -263,6 +268,13 @@ export default function Registration() {
     setLoading(true)
 
     try {
+      // Validation for reporter fields
+      if (formData.rescuer_type === 'Animal Bought by Reporter') {
+        if (!formData.reporter_name || !formData.reporter_address || !formData.reporter_phone || !formData.reporter_aadhaar_url) {
+          throw new Error('All reporter details are required when "Animal Bought by Reporter" is selected.')
+        }
+      }
+      
       let currentAnimalId = animalId
       if (!currentAnimalId && formData.species && formData.gender) {
         currentAnimalId = await generateUniqueAnimalId(formData.species, formData.gender)
@@ -290,6 +302,11 @@ export default function Registration() {
         lss_incharge: formData.lss_incharge,
         initial_assessment: formData.initial_assessment,
         reason_for_admission: formData.reason_for_admission,
+        rescuer_type: formData.rescuer_type,
+        reporter_name: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_name : null,
+        reporter_address: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_address : null,
+        reporter_phone: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_phone : null,
+        reporter_aadhaar_url: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_aadhaar_url : null,
       }
 
       let savedAnimalId = editAnimal?.id || null
@@ -657,7 +674,11 @@ export default function Registration() {
               <button
                 key={ward}
                 type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, ward }))}
+                onClick={() => setFormData((prev) => ({ 
+                  ...prev, 
+                  ward,
+                  category: ward === 'opd' ? '' : prev.category
+                }))}
                 style={{
                   flex: '1 1 auto',
                   minWidth: '100px',
@@ -677,33 +698,36 @@ export default function Registration() {
         </div>
 
         {/* 12. Category */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Category *
-          </label>
-          <select
-            name="category"
-            value={formData.category}
-            onChange={handleInputChange}
-            required
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #E0E0E0',
-              borderRadius: '12px',
-              fontSize: '14px',
-            }}
-          >
-            <option value="normal">Normal</option>
-            <option value="paralysed">Paralysed</option>
-            <option value="blind">Blind</option>
-            <option value="neurological">Neurological</option>
-            <option value="behavioural">Behavioural Problems</option>
-            <option value="senior">Senior Care</option>
-            <option value="disabled">Disabled</option>
-            <option value="chemo">Chemo</option>
-          </select>
-        </div>
+        {formData.ward && formData.ward !== 'opd' && (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+              Category *
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              required
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #E0E0E0',
+                borderRadius: '12px',
+                fontSize: '14px',
+              }}
+            >
+              <option value="">Select Category</option>
+              <option value="normal">Normal</option>
+              <option value="paralysed">Paralysed</option>
+              <option value="blind">Blind</option>
+              <option value="neurological">Neurological</option>
+              <option value="behavioural">Behavioural Problems</option>
+              <option value="senior">Senior Care</option>
+              <option value="disabled">Disabled</option>
+              <option value="chemo">Chemo</option>
+            </select>
+          </div>
+        )}
 
         {/* 13. LSS Incharge */}
         <div style={{ marginBottom: '16px' }}>
@@ -826,7 +850,99 @@ export default function Registration() {
             </div>
           )}
         </div>
-
+        {/* Rescued / Reporter */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Rescued / Reporter *</label>
+          <select
+            name="rescuer_type"
+            value={formData.rescuer_type}
+            onChange={handleInputChange}
+            required
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #E0E0E0',
+              borderRadius: '12px',
+              fontSize: '14px',
+            }}
+          >
+            <option value="">Select</option>
+            <option value="Rescued Animal">Rescued Animal</option>
+            <option value="Animal Bought by Reporter">Animal Bought by Reporter</option>
+          </select>
+        </div>
+        {formData.rescuer_type === 'Animal Bought by Reporter' && (
+          <>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Name *</label>
+              <input
+                type="text"
+                name="reporter_name"
+                value={formData.reporter_name}
+                onChange={handleInputChange}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #E0E0E0',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Address *</label>
+              <input
+                type="text"
+                name="reporter_address"
+                value={formData.reporter_address}
+                onChange={handleInputChange}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #E0E0E0',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Phone *</label>
+              <input
+                type="text"
+                name="reporter_phone"
+                value={formData.reporter_phone}
+                onChange={handleInputChange}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #E0E0E0',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Aadhaar URL *</label>
+              <input
+                type="text"
+                name="reporter_aadhaar_url"
+                value={formData.reporter_aadhaar_url}
+                onChange={handleInputChange}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #E0E0E0',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+          </>
+        )}
         {/* Submit Button */}
         <button
           type="submit"
