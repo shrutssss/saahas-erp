@@ -1,6 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+
+
+const primaryButtonStyle = {
+  width: '100%',
+  padding: '12px',
+  backgroundColor: '#F5C800',
+  border: 'none',
+  borderRadius: '50px',
+  fontWeight: 'bold',
+  fontSize: '14px',
+  cursor: 'pointer',
+  color: '#000',
+}
+
+function BottomSheet({ title, onClose, children }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 1000 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderRadius: '16px 16px 0 0', padding: '16px', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', maxHeight: '85vh', overflowY: 'auto', zIndex: 1001 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>{title}</h3>
+          <button onClick={onClose} type="button" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+        </div>
+        {children}
+      </div>
+    </>
+  )
+}
 
 export default function Registration() {
   const navigate = useNavigate()
@@ -9,6 +37,13 @@ export default function Registration() {
   const isEditMode = Boolean(editAnimal)
   const [loading, setLoading] = useState(false)
   const [notification, setNotification] = useState(null)
+  
+  const [reporterPic, setReporterPic] = useState({ file: null, previewUrl: '' })
+  const [reporterAadhaar, setReporterAadhaar] = useState({ file: null, previewUrl: '' })
+  const [reporterDetailSheet, setReporterDetailSheet] = useState({ file: null, previewUrl: '' })
+  const [activeUploadField, setActiveUploadField] = useState(null)
+  const uploadInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
   const [formData, setFormData] = useState({
     name: '',
     species: 'dog',
@@ -27,8 +62,7 @@ export default function Registration() {
     rescuer_type: '', // New field
     reporter_name: '', // Conditional fields
     reporter_address: '',
-    reporter_phone: '',
-    reporter_aadhaar_url: ''
+    reporter_phone: ''
   })
 
   const [animalId, setAnimalId] = useState('')
@@ -104,7 +138,16 @@ export default function Registration() {
       lss_incharge: editAnimal.lss_incharge || '',
       initial_assessment: editAnimal.initial_assessment || '',
       reason_for_admission: editAnimal.reason_for_admission || '',
+      rescuer_type: editAnimal.rescuer_type || '',
+      reporter_name: editAnimal.reporter_name || '',
+      reporter_address: editAnimal.reporter_address || '',
+      reporter_phone: editAnimal.reporter_phone || '',
     })
+    
+    if (editAnimal.reporter_photo_url) setReporterPic({ file: null, previewUrl: editAnimal.reporter_photo_url })
+    if (editAnimal.reporter_aadhaar_url) setReporterAadhaar({ file: null, previewUrl: editAnimal.reporter_aadhaar_url })
+    if (editAnimal.reporter_detail_sheet_url) setReporterDetailSheet({ file: null, previewUrl: editAnimal.reporter_detail_sheet_url })
+    
     setAnimalId(editAnimal.animal_id || '')
   }, [editAnimal])
 
@@ -244,6 +287,28 @@ export default function Registration() {
   const CLOUDINARY_CLOUD_NAME = 'dtixpptzy'
   const CLOUDINARY_UPLOAD_PRESET = 'saahas_unsigned'
 
+
+  const handleReporterFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const stateObj = { file, previewUrl: event.target.result }
+      if (activeUploadField === 'pic') setReporterPic(stateObj)
+      if (activeUploadField === 'aadhaar') setReporterAadhaar(stateObj)
+      if (activeUploadField === 'sheet') setReporterDetailSheet(stateObj)
+      setActiveUploadField(null)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeReporterFile = (field) => {
+    if (field === 'pic') setReporterPic({ file: null, previewUrl: '' })
+    if (field === 'aadhaar') setReporterAadhaar({ file: null, previewUrl: '' })
+    if (field === 'sheet') setReporterDetailSheet({ file: null, previewUrl: '' })
+  }
+
   const uploadToCloudinary = async (file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -270,8 +335,8 @@ export default function Registration() {
     try {
       // Validation for reporter fields
       if (formData.rescuer_type === 'Animal Bought by Reporter') {
-        if (!formData.reporter_name || !formData.reporter_address || !formData.reporter_phone || !formData.reporter_aadhaar_url) {
-          throw new Error('All reporter details are required when "Animal Bought by Reporter" is selected.')
+        if (!formData.reporter_name || !formData.reporter_phone) {
+          throw new Error('Name and Phone are required when "Animal Bought by Reporter" is selected.')
         }
       }
       
@@ -285,6 +350,17 @@ export default function Registration() {
         throw new Error('Animal ID could not be generated. Please select species and gender.')
       }
 
+
+      let picUrl = reporterPic.previewUrl && !reporterPic.file ? reporterPic.previewUrl : null;
+      let aadhaarUrl = reporterAadhaar.previewUrl && !reporterAadhaar.file ? reporterAadhaar.previewUrl : null;
+      let detailSheetUrl = reporterDetailSheet.previewUrl && !reporterDetailSheet.file ? reporterDetailSheet.previewUrl : null;
+
+      if (formData.rescuer_type === 'Animal Bought by Reporter') {
+        if (reporterPic.file) picUrl = await uploadToCloudinary(reporterPic.file);
+        if (reporterAadhaar.file) aadhaarUrl = await uploadToCloudinary(reporterAadhaar.file);
+        if (reporterDetailSheet.file) detailSheetUrl = await uploadToCloudinary(reporterDetailSheet.file);
+      }
+      
       const animalPayload = {
         animal_id: currentAnimalId,
         name: formData.name,
@@ -306,7 +382,9 @@ export default function Registration() {
         reporter_name: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_name : null,
         reporter_address: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_address : null,
         reporter_phone: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_phone : null,
-        reporter_aadhaar_url: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_aadhaar_url : null,
+        reporter_photo_url: picUrl,
+        reporter_aadhaar_url: aadhaarUrl,
+        reporter_detail_sheet_url: detailSheetUrl,
       }
 
       let savedAnimalId = editAnimal?.id || null
@@ -772,6 +850,84 @@ export default function Registration() {
           />
         </div>
 
+        {/* Rescued / Reporter */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Rescued / Reporter *</label>
+          <select
+            name="rescuer_type"
+            value={formData.rescuer_type}
+            onChange={handleInputChange}
+            required
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #E0E0E0',
+              borderRadius: '12px',
+              fontSize: '14px',
+            }}
+          >
+            <option value="">Select</option>
+            <option value="Rescued Animal">Rescued Animal</option>
+            <option value="Animal Bought by Reporter">Animal Bought by Reporter</option>
+          </select>
+        </div>
+        {formData.rescuer_type === 'Animal Bought by Reporter' && (
+          <>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>
+                Reporter Details
+              </label>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Name *</label>
+              <input type="text" name="reporter_name" value={formData.reporter_name} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '12px', fontSize: '14px' }} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Phone *</label>
+              <input type="text" name="reporter_phone" value={formData.reporter_phone} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '12px', fontSize: '14px' }} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Address</label>
+              <input type="text" name="reporter_address" value={formData.reporter_address} onChange={handleInputChange} style={{ width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '12px', fontSize: '14px' }} />
+            </div>
+            
+            {/* New Image Upload Fields */}
+            {[
+              { id: 'pic', label: 'Upload Reporter Pic', state: reporterPic },
+              { id: 'aadhaar', label: 'Upload Reporter Aadhaar / ID', state: reporterAadhaar },
+              { id: 'sheet', label: 'Upload Reporter Detail Sheet', state: reporterDetailSheet }
+            ].map(field => (
+              <div key={field.id} style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                  {field.label}
+                </label>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveUploadField(field.id)}
+                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F0F0F0', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+                  >
+                    Select Image
+                  </button>
+                  {field.state.previewUrl && (
+                    <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E0E0E0' }}>
+                      <img src={field.state.previewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button
+                        type="button"
+                        onClick={() => removeReporterFile(field.id)}
+                        style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', border: 'none', borderRadius: '0 0 0 4px', width: '16px', height: '16px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
         {/* 14. Current Condition */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
@@ -850,99 +1006,6 @@ export default function Registration() {
             </div>
           )}
         </div>
-        {/* Rescued / Reporter */}
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Rescued / Reporter *</label>
-          <select
-            name="rescuer_type"
-            value={formData.rescuer_type}
-            onChange={handleInputChange}
-            required
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #E0E0E0',
-              borderRadius: '12px',
-              fontSize: '14px',
-            }}
-          >
-            <option value="">Select</option>
-            <option value="Rescued Animal">Rescued Animal</option>
-            <option value="Animal Bought by Reporter">Animal Bought by Reporter</option>
-          </select>
-        </div>
-        {formData.rescuer_type === 'Animal Bought by Reporter' && (
-          <>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Name *</label>
-              <input
-                type="text"
-                name="reporter_name"
-                value={formData.reporter_name}
-                onChange={handleInputChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #E0E0E0',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Address *</label>
-              <input
-                type="text"
-                name="reporter_address"
-                value={formData.reporter_address}
-                onChange={handleInputChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #E0E0E0',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Phone *</label>
-              <input
-                type="text"
-                name="reporter_phone"
-                value={formData.reporter_phone}
-                onChange={handleInputChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #E0E0E0',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Reporter Aadhaar URL *</label>
-              <input
-                type="text"
-                name="reporter_aadhaar_url"
-                value={formData.reporter_aadhaar_url}
-                onChange={handleInputChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #E0E0E0',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-          </>
-        )}
         {/* Submit Button */}
         <button
           type="submit"
@@ -963,6 +1026,38 @@ export default function Registration() {
           {loading ? (isEditMode ? 'Updating Animal...' : 'Registering Animal...') : (isEditMode ? 'Update Animal' : 'Register Animal')}
         </button>
       </form>
+
+      <input ref={uploadInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleReporterFileSelect} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleReporterFileSelect} />
+
+      {activeUploadField && (
+        <BottomSheet
+          title={
+            activeUploadField === 'pic' ? 'Upload Reporter Pic' :
+            activeUploadField === 'aadhaar' ? 'Upload Reporter Aadhaar / ID' :
+            'Upload Reporter Detail Sheet'
+          }
+          onClose={() => setActiveUploadField(null)}
+        >
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => { cameraInputRef.current?.click(); setActiveUploadField(null); }}
+              style={{ flex: 1, padding: '12px', backgroundColor: '#F0F0F0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Take Pic
+            </button>
+            <button
+              type="button"
+              onClick={() => { uploadInputRef.current?.click(); setActiveUploadField(null); }}
+              style={{ flex: 1, padding: '12px', backgroundColor: '#F0F0F0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              Upload Pic
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
     </div>
   )
 }
