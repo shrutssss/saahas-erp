@@ -156,6 +156,7 @@ export default function AnimalProfile() {
   const [medicalRecords, setMedicalRecords] = useState([])
   const [treatmentSheets, setTreatmentSheets] = useState([])
   const [reports, setReports] = useState([])
+  const [surgeries, setSurgeries] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('details')
   const [selectedPhoto, setSelectedPhoto] = useState(null)
@@ -164,6 +165,7 @@ export default function AnimalProfile() {
   const [showMedicalForm, setShowMedicalForm] = useState(false)
   const [showTreatmentSheetForm, setShowTreatmentSheetForm] = useState(false)
   const [showReportForm, setShowReportForm] = useState(false);
+  const [showSurgeryForm, setShowSurgeryForm] = useState(false);
   const [showRequestTreatmentForm, setShowRequestTreatmentForm] = useState(false);
   const [requestSaving, setRequestSaving] = useState(false)
 
@@ -191,6 +193,7 @@ export default function AnimalProfile() {
   const [medicalSaving, setMedicalSaving] = useState(false)
   const [treatmentSheetSaving, setTreatmentSheetSaving] = useState(false)
   const [reportSaving, setReportSaving] = useState(false)
+  const [surgerySaving, setSurgerySaving] = useState(false)
   const [notification, setNotification] = useState(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -214,6 +217,14 @@ export default function AnimalProfile() {
     file: null,
     previewUrl: '',
   })
+
+  const [surgeryForm, setSurgeryForm] = useState({
+    surgery_name: '',
+    doctor_name: '',
+    surgery_date: todayString(),
+    notes: '',
+  })
+  const [showCustomSurgeryInput, setShowCustomSurgeryInput] = useState(false)
 
   const treatmentUploadRef = useRef(null)
   const treatmentCameraRef = useRef(null)
@@ -336,13 +347,16 @@ export default function AnimalProfile() {
 
   const fetchData = async () => {
     try {
-      const [animalRes, photosRes, medicalRes, sheetsRes, reportsRes] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('animals').select('*').eq('id', id).single(),
         supabase.from('animal_photos').select('*').eq('animal_id', id).order('uploaded_at', { ascending: false }),
         supabase.from('medical_records').select('*').eq('animal_id', id).order('record_date', { ascending: false }).order('created_at', { ascending: false }),
         supabase.from('treatment_sheets').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
         supabase.from('animal_reports').select('*').eq('animal_id', id).order('created_at', { ascending: false }),
+        supabase.from('surgeries').select('*').eq('animal_id', id).order('surgery_date', { ascending: false }),
       ])
+      
+      const [animalRes, photosRes, medicalRes, sheetsRes, reportsRes, surgeriesRes] = results;
 
       if (animalRes.data) {
         setAnimal(animalRes.data)
@@ -356,6 +370,8 @@ export default function AnimalProfile() {
       else if (sheetsRes.data) setTreatmentSheets(sheetsRes.data)
       if (reportsRes.error) console.error('Error fetching reports:', reportsRes.error)
       else if (reportsRes.data) setReports(reportsRes.data)
+      if (surgeriesRes.error) console.error('Error fetching surgeries:', surgeriesRes.error)
+      else if (surgeriesRes.data) setSurgeries(surgeriesRes.data)
     } catch (err) {
       console.error('Error fetching animal data:', err)
     } finally {
@@ -437,6 +453,42 @@ export default function AnimalProfile() {
       showToast('error', `Failed to save recovery: ${err.message}`)
     } finally {
       setStatusLoading(false)
+    }
+  }
+
+  const handleAddSurgery = async (e) => {
+    e.preventDefault()
+    if (!surgeryForm.surgery_name.trim() || !surgeryForm.doctor_name.trim()) {
+      showToast('error', 'Surgery name and doctor name are required')
+      return
+    }
+
+    setSurgerySaving(true)
+    try {
+      const { data, error } = await supabase
+        .from('surgeries')
+        .insert({
+          animal_id: id,
+          surgery_name: surgeryForm.surgery_name.trim(),
+          doctor_name: surgeryForm.doctor_name.trim(),
+          surgery_date: surgeryForm.surgery_date,
+          notes: surgeryForm.notes.trim(),
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      setSurgeries((prev) => [data, ...prev])
+      setShowSurgeryForm(false)
+      setShowCustomSurgeryInput(false)
+      setSurgeryForm({ surgery_name: '', doctor_name: '', surgery_date: todayString(), notes: '' })
+      showToast('success', 'Surgery record saved successfully')
+    } catch (err) {
+      console.error('Error adding surgery record:', err)
+      showToast('error', `Failed to save surgery record: ${err.message}`)
+    } finally {
+      setSurgerySaving(false)
     }
   }
 
@@ -615,8 +667,7 @@ export default function AnimalProfile() {
       await supabase.from('treatment_entries').delete().eq('animal_id', id)
       await supabase.from('observation_logs').delete().eq('animal_id', id)
       await supabase.from('animal_photos').delete().eq('animal_id', id)
-
-
+      await supabase.from('surgeries').delete().eq('animal_id', id)
 
       const { error: animalError } = await supabase.from('animals').delete().eq('id', id)
       if (animalError) throw animalError
@@ -646,6 +697,7 @@ export default function AnimalProfile() {
   const tabs = [
     { key: 'details', label: 'Observation' },
     { key: 'medical', label: 'Medical Record' },
+    { key: 'surgery', label: 'Surgery' },
     { key: 'treatment', label: 'Treatment Sheet' },
     { key: 'reports', label: 'Reports' },
   ]
@@ -890,10 +942,12 @@ export default function AnimalProfile() {
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Colour / Marks</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.colour || '—'}</p>
               </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
-              </div>
+              {animal.ward && animal.ward.toLowerCase() !== 'opd' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>LSS Incharge</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.lss_incharge || '—'}</p>
@@ -906,6 +960,37 @@ export default function AnimalProfile() {
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Current Condition</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>{animal.initial_assessment || '—'}</p>
               </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescuer / Reporter</label>
+                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescuer_type || 'Rescued Animal'}</p>
+              </div>
+              {animal.rescuer_type === 'Animal Bought by Reporter' && (
+                <div style={{ marginBottom: '16px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '12px', color: '#666' }}>Name:</span>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_name || '—'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '12px', color: '#666' }}>Address:</span>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_address || '—'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '12px', color: '#666' }}>Phone:</span>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_phone || '—'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '12px', color: '#666' }}>Aadhaar URL:</span>
+                      {animal.reporter_aadhaar_url ? (
+                        <a href={animal.reporter_aadhaar_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>View Aadhaar</a>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>—</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Update Status</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -976,6 +1061,46 @@ export default function AnimalProfile() {
             </div>
           )}
 
+          {activeTab === 'surgery' && (
+            <div>
+              {role && (role === 'admin' || role === 'doctor') && (
+                <button onClick={() => setShowSurgeryForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
+                  + Add Surgery
+                </button>
+              )}
+              {surgeries.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No surgeries yet</p>
+              ) : (
+                surgeries.map((surgery) => (
+                  <div key={surgery.id} style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'baseline', marginBottom: '8px', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#1A1A1A' }}>Date: {formatDisplayDate(surgery.surgery_date)}</span>
+                      <span style={{ fontSize: '13px', color: '#1A1A1A' }}>Doctor: {surgery.doctor_name || '—'}</span>
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1A1A1A', marginBottom: '8px' }}>
+                      {surgery.surgery_name}
+                    </div>
+                    {surgery.notes && (
+                      <div
+                        style={{
+                          backgroundColor: '#F5F5F5',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          fontSize: '14px',
+                          color: '#1A1A1A',
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {surgery.notes}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
           {activeTab === 'treatment' && (
             <div>
               <button onClick={() => setShowTreatmentSheetForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
@@ -1037,6 +1162,95 @@ export default function AnimalProfile() {
         >
           <img src={selectedPhoto.photo_url} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px' }} />
         </div>
+      )}
+
+      {showSurgeryForm && (
+        <BottomSheet title="Add Surgery" onClose={() => {
+          if (!surgerySaving) {
+            setShowSurgeryForm(false)
+            setShowCustomSurgeryInput(false)
+          }
+        }}>
+          <form onSubmit={handleAddSurgery}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
+              <input
+                type="date"
+                required
+                value={surgeryForm.surgery_date}
+                onChange={(e) => setSurgeryForm({ ...surgeryForm, surgery_date: e.target.value })}
+                style={sheetInputStyle}
+              />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Surgery Name</label>
+              {showCustomSurgeryInput ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter surgery name"
+                    value={surgeryForm.surgery_name}
+                    onChange={(e) => setSurgeryForm({ ...surgeryForm, surgery_name: e.target.value })}
+                    style={{ ...sheetInputStyle, flex: 1 }}
+                  />
+                  <button type="button" onClick={() => {
+                    setShowCustomSurgeryInput(false)
+                    setSurgeryForm({ ...surgeryForm, surgery_name: '' })
+                  }} style={{ background: 'none', border: 'none', fontSize: '12px', color: '#2563EB', cursor: 'pointer', textDecoration: 'underline' }}>
+                    Select from list
+                  </button>
+                </div>
+              ) : (
+                <select
+                  required
+                  value={surgeryForm.surgery_name}
+                  onChange={(e) => {
+                    if (e.target.value === 'Others') {
+                      setShowCustomSurgeryInput(true)
+                      setSurgeryForm({ ...surgeryForm, surgery_name: '' })
+                    } else {
+                      setSurgeryForm({ ...surgeryForm, surgery_name: e.target.value })
+                    }
+                  }}
+                  style={sheetInputStyle}
+                >
+                  <option value="">Select Surgery</option>
+                  <option value="ABC">ABC</option>
+                  <option value="Enucleation (Eye Removal)">Enucleation (Eye Removal)</option>
+                  <option value="Tumor Removal">Tumor Removal</option>
+                  <option value="Amputation">Amputation</option>
+                  <option value="Jaw Repair">Jaw Repair</option>
+                  <option value="Hernia Repair">Hernia Repair</option>
+                  <option value="Others">Others</option>
+                </select>
+              )}
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Doctor Name</label>
+              <input
+                type="text"
+                required
+                placeholder="Enter doctor name"
+                value={surgeryForm.doctor_name}
+                onChange={(e) => setSurgeryForm({ ...surgeryForm, doctor_name: e.target.value })}
+                style={sheetInputStyle}
+              />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Notes (Optional)</label>
+              <textarea
+                placeholder="Enter additional notes or surgeon name"
+                value={surgeryForm.notes}
+                onChange={(e) => setSurgeryForm({ ...surgeryForm, notes: e.target.value })}
+                style={{ ...sheetInputStyle, minHeight: '80px', fontFamily: 'inherit' }}
+              />
+            </div>
+            <button type="submit" disabled={surgerySaving} style={{ ...primaryButtonStyle, opacity: surgerySaving ? 0.7 : 1 }}>
+              {surgerySaving ? 'Saving...' : 'Save Surgery'}
+            </button>
+          </form>
+        </BottomSheet>
       )}
 
       {showMedicalForm && (

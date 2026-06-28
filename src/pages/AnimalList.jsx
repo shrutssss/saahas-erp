@@ -14,7 +14,9 @@ export default function AnimalList({ ward = 'opd' }) {
   const [searchQuery, setSearchQuery] = useState('')
 
   const wardTitle = ward === 'opd' ? 'OPD' : ward === 'ipd' ? 'IPD' : 'In-House'
-  const conditions = ['Recovered', 'Paralyzed', 'Blind', 'Neurological', 'Behavioral', 'Critical']
+  const conditions = ward === 'opd'
+    ? []
+    : ['Recovered', 'Paralyzed', 'Blind', 'Neurological', 'Behavioral', 'Critical']
 
   useEffect(() => {
     const fetchAnimals = async () => {
