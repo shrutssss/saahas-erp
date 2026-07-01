@@ -3,6 +3,7 @@ import { useEffect, useState, useContext, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -733,20 +734,34 @@ export default function AnimalProfile() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px',
-          padding: '16px',
+          gap: '12px',
+          padding: '14px 16px',
           background: '#FFFFFF',
-          borderBottom: '1px solid #E0E0E0',
+          borderBottom: '1px solid #F0F0F0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
         }}
       >
         <button
           onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}
+          style={{
+            background: '#F5F5F5',
+            border: 'none',
+            borderRadius: '10px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
         >
-          ←
+          <ArrowLeft size={20} color="#1A1A1A" />
         </button>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, fontFamily: brandFont, flex: 1 }}>Saahas</h1>
-        <SaahasLogo size={44} />
+        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, fontFamily: brandFont, flex: 1, color: '#1A1A1A' }}>Saahas</h1>
+        <SaahasLogo size={36} />
       </div>
 
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
@@ -755,22 +770,17 @@ export default function AnimalProfile() {
             <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <button
                 onClick={() => navigate('/register', { state: { animal } })}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                style={{ background: '#F5F5F5', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 aria-label="Edit animal"
               >
-                ✎
+                <Pencil size={17} color="#555" />
               </button>
               <button
                 onClick={() => setShowDeleteModal(true)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: '#FEE2E2', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 aria-label="Delete animal"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
+                <Trash2 size={17} color="#EF4444" />
               </button>
             </div>
           )}

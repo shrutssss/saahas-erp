@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
+import { LogOut, Menu, X, LayoutDashboard, Stethoscope, BedDouble, House, ClipboardList, PlusCircle } from 'lucide-react'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -18,7 +19,6 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch animals by species
         const { data: animals } = await supabase.from('animals').select('species').eq('is_active', true)
         if (animals) {
           const counts = { dog: 0, cat: 0, cow: 0, other: 0 }
@@ -27,11 +27,9 @@ export default function Dashboard() {
             const normalized = counts[species] !== undefined ? species : 'other'
             counts[normalized] += 1
           })
-
           setSpeciesCounts(counts)
         }
 
-        // Fetch monthly stats
         const { data: stats } = await supabase
           .from('monthly_stats')
           .select('*')
@@ -94,10 +92,7 @@ export default function Dashboard() {
     try {
       const { error } = await supabase
         .from('monthly_stats')
-        .upsert(
-          { month: monthKey, ...monthlyStats },
-          { onConflict: 'month' }
-        )
+        .upsert({ month: monthKey, ...monthlyStats }, { onConflict: 'month' })
 
       if (!error) {
         setOriginalStats({ ...monthlyStats })
@@ -128,9 +123,10 @@ export default function Dashboard() {
         }}
         style={{
           cursor: 'pointer',
-          padding: '8px',
+          padding: '10px 8px',
           textAlign: 'center',
-          border: '1px solid #E0E0E0',
+          border: '1px solid #EFEFEF',
+          fontSize: '14px',
         }}
       >
         {value}
@@ -149,193 +145,175 @@ export default function Dashboard() {
   }
 
   const speciesCards = [
-    { key: 'dog', label: 'Dogs' },
-    { key: 'cat', label: 'Cats' },
-    { key: 'cow', label: 'Cows' },
-    { key: 'other', label: 'Other' },
+    { key: 'dog', label: 'Dogs', emoji: '🐕' },
+    { key: 'cat', label: 'Cats', emoji: '🐈' },
+    { key: 'cow', label: 'Cows', emoji: '🐄' },
+    { key: 'other', label: 'Other', emoji: '🐾' },
   ]
 
-  if (loading) return <div style={{ padding: '16px' }}>Loading...</div>
+  if (loading) return <div style={{ padding: '24px', textAlign: 'center', color: '#888' }}>Loading…</div>
+
+  const navLinks = [
+    { label: 'Dashboard', path: '/dashboard', Icon: LayoutDashboard },
+    { label: 'OPD', path: '/opd', Icon: Stethoscope },
+    { label: 'IPD', path: '/ipd', Icon: BedDouble },
+    { label: 'In-House', path: '/inhouse', Icon: House },
+    { label: 'Tracking', path: '/tracking', Icon: ClipboardList },
+    { label: 'Register Animal', path: '/register', Icon: PlusCircle },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#FFFFFF', paddingBottom: '100px' }}>
+
+      {/* Sidebar Drawer Overlay */}
+      {showMenu && (
+        <div
+          onClick={() => setShowMenu(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 200 }}
+        />
+      )}
+
+      {/* Slide-out Sidebar */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: '260px',
+        background: '#FFFFFF',
+        zIndex: 201,
+        boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
+        transform: showMenu ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Sidebar Header */}
+        <div style={{
+          background: '#F5C800',
+          padding: '20px 16px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <SaahasLogo size={34} />
+            <span style={{ fontFamily: brandFont, fontSize: '18px', fontWeight: 700, color: '#1A1A1A' }}>Saahas</span>
+          </div>
+          <button
+            onClick={() => setShowMenu(false)}
+            style={{ background: 'rgba(0,0,0,0.10)', border: 'none', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <X size={18} color="#1A1A1A" />
+          </button>
+        </div>
+
+        {/* Nav Links */}
+        <nav style={{ padding: '12px 10px', flex: 1 }}>
+          {navLinks.map(({ label, path, Icon }) => (
+            <button
+              key={path}
+              onClick={() => { navigate(path); setShowMenu(false) }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '13px 14px',
+                background: location.pathname === path ? '#FFF4BF' : 'transparent',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                marginBottom: '4px',
+                textAlign: 'left',
+              }}
+            >
+              <Icon size={18} color={location.pathname === path ? '#C49A00' : '#555'} strokeWidth={location.pathname === path ? 2.2 : 1.8} />
+              <span style={{ fontSize: '14px', fontWeight: 600, color: location.pathname === path ? '#C49A00' : '#333' }}>{label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* Logout at bottom */}
+        <div style={{ padding: '12px 10px', borderTop: '1px solid #F0F0F0' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '13px 14px',
+              background: '#FEE2E2',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            <LogOut size={18} color="#EF4444" />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#EF4444' }}>Logout</span>
+          </button>
+        </div>
+      </div>
+
       {/* Top Bar */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px',
+          padding: '14px 16px',
           background: '#FFFFFF',
-          borderBottom: '1px solid #E0E0E0',
+          borderBottom: '1px solid #F0F0F0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
         }}
       >
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '24px',
-            cursor: 'pointer',
-          }}
-        >
-          ☰
-        </button>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, fontFamily: brandFont }}>Saahas</h1>
-        <SaahasLogo size={44} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setShowMenu(true)}
+            style={{ background: '#F5F5F5', border: 'none', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <Menu size={20} color="#1A1A1A" />
+          </button>
+          <span style={{ fontFamily: brandFont, fontSize: '20px', fontWeight: 700, color: '#1A1A1A' }}>
+            Saahas
+          </span>
+        </div>
+        <SaahasLogo size={36} />
       </div>
 
-      {/* Sidebar Menu */}
-      {showMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 1000,
-          }}
-          onClick={() => setShowMenu(false)}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: '80%',
-              height: '100%',
-              background: '#FFFFFF',
-              padding: '16px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>Menu</h2>
-            <ul style={{ listStyle: 'none', padding: 0, flex: 1 }}>
-              <li style={{ marginBottom: '12px' }}>
-                <a
-                  href="/dashboard"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#F5C800',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowMenu(false)}
-                >
-                  Dashboard
-                </a>
-              </li>
-              <li style={{ marginBottom: '12px' }}>
-                <a
-                  href="/opd"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#F5C800',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowMenu(false)}
-                >
-                  OPD
-                </a>
-              </li>
-              <li style={{ marginBottom: '12px' }}>
-                <a
-                  href="/ipd"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#F5C800',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowMenu(false)}
-                >
-                  IPD
-                </a>
-              </li>
-              <li style={{ marginBottom: '12px' }}>
-                <a
-                  href="/inhouse"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#F5C800',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowMenu(false)}
-                >
-                  In-house
-                </a>
-              </li>
-              <li style={{ marginBottom: '12px' }}>
-                <a
-                  href="/daily-tracking"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#F5C800',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setShowMenu(false)}
-                >
-                  Daily Tracking
-                </a>
-              </li>
-            </ul>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                background: '#F5C800',
-                color: '#000000',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '14px',
-                fontSize: '16px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                marginTop: '16px',
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
-      <main style={{ padding: '16px' }}>
-        {/* Section 1: Species Summary */}
+      <main style={{ padding: '20px 16px' }}>
+        {/* Species Summary */}
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ marginBottom: '16px' }}>Live Animal Count</h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              gap: '12px',
-            }}
-          >
+          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', color: '#1A1A1A' }}>
+            Live Animal Count
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
             {speciesCards.map((card) => (
               <div
                 key={card.key}
                 style={{
-                  background: '#F8F8F8',
-                  border: '2px solid #F5C800',
-                  borderRadius: '18px',
-                  padding: '18px 16px',
-                  minHeight: '120px',
+                  background: '#FAFAFA',
+                  border: '1.5px solid #F5C800',
+                  borderRadius: '20px',
+                  padding: '20px 16px',
+                  minHeight: '110px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+                  boxShadow: '0 2px 10px rgba(245,200,0,0.12)',
                 }}
               >
-                <div>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1A1A1A' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>{card.emoji}</span>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#555' }}>
                     {card.label}
                   </p>
                 </div>
-                <div style={{ fontSize: '34px', fontWeight: 800, lineHeight: 1, color: '#000000' }}>
+                <div style={{ fontSize: '38px', fontWeight: 800, color: '#1A1A1A', lineHeight: 1 }}>
                   {speciesCounts[card.key]}
                 </div>
               </div>
@@ -343,46 +321,33 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Section 2: Monthly Stats Table */}
+        {/* Monthly Stats Table */}
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ marginBottom: '16px' }}>{currentMonth} Stats</h2>
-          <div style={{ overflowX: 'auto' }}>
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                background: '#F5F5F5',
-                borderRadius: '16px',
-                overflow: 'hidden',
-              }}
-            >
+          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', color: '#1A1A1A' }}>
+            {currentMonth} Stats
+          </h2>
+          <div style={{ overflowX: 'auto', borderRadius: '16px', border: '1px solid #F0F0F0' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#FAFAFA', minWidth: '400px' }}>
               <thead>
-                <tr style={{ background: '#E0E0E0' }}>
-                  <th style={{ padding: '12px', textAlign: 'left' }}>Activity</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Dog</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Cat</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Cow</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Other</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Total</th>
+                <tr style={{ background: '#F5C800' }}>
+                  <th style={{ padding: '12px 10px', textAlign: 'left', fontSize: '13px', fontWeight: 700 }}>Activity</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Dog</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Cat</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Cow</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Other</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {['Admitted', 'Released', 'Deaths', 'Blood Test', 'X-Ray', 'Surgery', 'OPD', 'Rescue'].map(
-                  (activity) => (
-                    <tr key={activity}>
-                      <td style={{ padding: '12px', fontWeight: 600 }}>{activity}</td>
+                  (activity, i) => (
+                    <tr key={activity} style={{ background: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                      <td style={{ padding: '10px', fontWeight: 600, fontSize: '13px', borderBottom: '1px solid #F0F0F0' }}>{activity}</td>
                       {renderCell(activity, 'dog')}
                       {renderCell(activity, 'cat')}
                       {renderCell(activity, 'cow')}
                       {renderCell(activity, 'other')}
-                      <td
-                        style={{
-                          padding: '8px',
-                          textAlign: 'center',
-                          border: '1px solid #E0E0E0',
-                          fontWeight: 700,
-                        }}
-                      >
+                      <td style={{ padding: '10px 8px', textAlign: 'center', borderBottom: '1px solid #F0F0F0', fontWeight: 700, fontSize: '14px', color: '#F5C800' }}>
                         {calculateTotal(activity)}
                       </td>
                     </tr>
@@ -395,14 +360,14 @@ export default function Dashboard() {
             <button
               onClick={handleSaveStats}
               style={{
-                marginTop: '16px',
+                marginTop: '14px',
                 width: '100%',
                 background: '#F5C800',
                 color: '#000000',
                 border: 'none',
-                borderRadius: 50,
-                padding: '12px',
-                fontSize: '16px',
+                borderRadius: '50px',
+                padding: '14px',
+                fontSize: '15px',
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
@@ -411,7 +376,6 @@ export default function Dashboard() {
             </button>
           )}
         </div>
-
       </main>
 
       {/* Floating Add Button */}
@@ -419,97 +383,26 @@ export default function Dashboard() {
         onClick={() => navigate('/register')}
         style={{
           position: 'fixed',
-          bottom: '100px',
-          right: '16px',
-          width: '60px',
-          height: '60px',
+          bottom: '88px',
+          right: '20px',
+          width: '56px',
+          height: '56px',
           borderRadius: '50%',
           background: '#F5C800',
           color: '#000000',
           border: 'none',
-          fontSize: '32px',
+          fontSize: '28px',
           fontWeight: 'bold',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 16px rgba(245,200,0,0.45)',
           zIndex: 100,
         }}
       >
         +
       </button>
-
-      {/* Bottom Navigation */}
-      <nav
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: '#F5F5F5',
-          borderTop: '1px solid #E0E0E0',
-          display: 'flex',
-          justifyContent: 'space-around',
-          padding: '8px 0',
-          zIndex: 50,
-        }}
-      >
-        <a
-          href="/dashboard"
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '12px',
-            textDecoration: 'none',
-            color: '#1A1A1A',
-            fontSize: '12px',
-          }}
-        >
-          🏠 Home
-        </a>
-        <a
-          href="/inhouse"
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '12px',
-            textDecoration: 'none',
-            color: '#1A1A1A',
-            fontSize: '12px',
-          }}
-        >
-          🐾 In-house
-        </a>
-        <a
-          href="/daily-tracking"
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '12px',
-            textDecoration: 'none',
-            color: '#1A1A1A',
-            fontSize: '12px',
-          }}
-        >
-          📋 Tracking
-        </a>
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          style={{
-            flex: 1,
-            textAlign: 'center',
-            padding: '12px',
-            background: 'none',
-            border: 'none',
-            color: '#1A1A1A',
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          👤 Menu
-        </button>
-      </nav>
     </div>
   )
 }

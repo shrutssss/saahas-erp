@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { ArrowLeft } from 'lucide-react'
 
 
 const primaryButtonStyle = {
@@ -461,26 +462,36 @@ export default function Registration() {
       <div
         style={{
           background: '#F5C800',
-          padding: '16px',
+          padding: '14px 16px',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
+          gap: '12px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
         }}
       >
         <button
           onClick={() => navigate(-1)}
           style={{
-            background: 'none',
+            background: 'rgba(0,0,0,0.10)',
             border: 'none',
-            fontSize: '24px',
+            borderRadius: '10px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: 'pointer',
+            flexShrink: 0,
           }}
         >
-          ←
+          <ArrowLeft size={20} color="#1A1A1A" />
         </button>
-        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1, textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1, textAlign: 'center', color: '#1A1A1A' }}>
           {isEditMode ? 'Edit Animal' : 'Add New Animal'}
         </h1>
+        <div style={{ width: '36px' }} />
       </div>
 
       {/* Form */}

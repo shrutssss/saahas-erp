@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import SaahasLogo from '../components/SaahasLogo'
+import { ArrowLeft } from 'lucide-react'
 
 export default function AnimalList({ ward = 'opd' }) {
   const navigate = useNavigate()
@@ -123,27 +124,36 @@ export default function AnimalList({ ward = 'opd' }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px',
-          padding: '16px',
+          gap: '12px',
+          padding: '14px 16px',
           background: '#FFFFFF',
-          borderBottom: '1px solid #E0E0E0',
+          borderBottom: '1px solid #F0F0F0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
         }}
       >
         <button
           onClick={() => navigate(-1)}
           style={{
-            background: 'none',
+            background: '#F5F5F5',
             border: 'none',
-            fontSize: '24px',
+            borderRadius: '10px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: 'pointer',
+            flexShrink: 0,
           }}
         >
-          ←
+          <ArrowLeft size={20} color="#1A1A1A" />
         </button>
-        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1 }}>
-          {wardTitle} Animals
+        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, flex: 1, color: '#1A1A1A' }}>
+          {wardTitle}
         </h1>
-        <SaahasLogo size={44} />
+        <SaahasLogo size={36} />
       </div>
 
       {/* Content */}
@@ -217,11 +227,15 @@ export default function AnimalList({ ward = 'opd' }) {
           onChange={(e) => handleSearch(e.target.value)}
           style={{
             width: '100%',
-            padding: '12px',
-            border: '1px solid #E0E0E0',
-            borderRadius: '12px',
-            fontSize: '14px',
+            padding: '13px 16px',
+            border: '1.5px solid #EBEBEB',
+            borderRadius: '14px',
+            fontSize: '15px',
             marginBottom: '16px',
+            backgroundColor: '#FAFAFA',
+            fontFamily: 'inherit',
+            boxSizing: 'border-box',
+            color: '#1A1A1A',
           }}
         />
 
