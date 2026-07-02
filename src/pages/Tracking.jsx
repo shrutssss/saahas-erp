@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import SaahasLogo from '../components/SaahasLogo'
+import { ChevronRight } from 'lucide-react'
 
 export default function Tracking() {
   const navigate = useNavigate()
@@ -83,42 +84,52 @@ export default function Tracking() {
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          padding: '16px',
+          padding: '14px 16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: '1px solid #E0E0E0',
+          borderBottom: '1px solid #F0F0F0',
           position: 'sticky',
           top: 0,
-          zIndex: 10
+          zIndex: 50,
         }}
       >
-        <div>
-          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#000000' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#1A1A1A' }}>
             Tracking
           </h1>
-          <span style={{ backgroundColor: '#F59E0B', color: '#FFFFFF', borderRadius: '12px', padding: '2px 8px', fontSize: '12px', marginLeft: '8px' }}>{animals.length}</span>
-          <span style={{ fontSize: '12px', color: '#666666' }}>
-            Requires Veterinary Attention
-          </span>
+          {animals.length > 0 && (
+            <span style={{
+              backgroundColor: '#EF4444',
+              color: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '2px 9px',
+              fontSize: '12px',
+              fontWeight: 700,
+            }}>
+              {animals.length}
+            </span>
+          )}
         </div>
-        <SaahasLogo size={44} />
+        <SaahasLogo size={36} />
       </div>
 
       <div style={{ padding: '16px' }}>
         <input
           type="text"
-          placeholder="Search animal name or ID"
+          placeholder="Search by name or ID"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
             width: '100%',
-            padding: '12px 16px',
-            borderRadius: '12px',
-            border: '1px solid #E0E0E0',
-            fontSize: '14px',
+            padding: '13px 16px',
+            borderRadius: '14px',
+            border: '1.5px solid #EBEBEB',
+            fontSize: '15px',
             boxSizing: 'border-box',
             fontFamily: 'inherit',
+            backgroundColor: '#FAFAFA',
+            color: '#1A1A1A',
           }}
         />
       </div>
@@ -151,16 +162,17 @@ export default function Tracking() {
             {filtered.map((animal) => (
               <div
                 key={animal.id}
-                className="card"
                 onClick={(e) => handleCardClick(e, animal.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
                   cursor: 'pointer',
-                  minHeight: '64px',
-                  backgroundColor: '#F5F5F5',
-                  marginBottom: 0,
+                  padding: '14px',
+                  background: '#FFFFFF',
+                  border: '1px solid #F0F0F0',
+                  borderRadius: '16px',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
                 }}
               >
                 <div
@@ -232,9 +244,7 @@ export default function Tracking() {
                   >
                     {animal.current_status || 'Unknown'}
                   </span>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
+                  <ChevronRight size={20} color="#BBBBBB" />
                 </div>
               </div>
             ))}

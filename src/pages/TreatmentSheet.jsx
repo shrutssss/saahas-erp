@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { ArrowLeft } from 'lucide-react'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -147,17 +148,20 @@ export default function TreatmentSheet() {
             position: 'absolute',
             top: '16px',
             left: '16px',
-            background: 'none',
+            background: '#EBEBEB',
             border: 'none',
-            fontSize: '24px',
+            borderRadius: '10px',
+            width: '34px',
+            height: '34px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: 'pointer',
-            color: '#000000',
             padding: 0,
-            lineHeight: 1,
           }}
           aria-label="Go back"
         >
-          ←
+          <ArrowLeft size={18} color="#1A1A1A" />
         </button>
 
         <div style={{ display: 'flex', gap: '12px', marginLeft: '40px' }}>
