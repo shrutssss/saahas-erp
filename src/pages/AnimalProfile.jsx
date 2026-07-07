@@ -1,9 +1,9 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, useContext, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Eye, Stethoscope, Scissors, ClipboardList, FileText } from 'lucide-react'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -53,6 +53,22 @@ const getReportTypeLabel = (type, customType) => {
 }
 
 const todayString = () => new Date().toISOString().split('T')[0]
+
+const hasDisplayValue = (value) => {
+  if (value == null) return false
+  const trimmed = String(value).trim()
+  return trimmed !== '' && trimmed.toLowerCase() !== 'unknown'
+}
+
+function ObservationField({ label, value, preWrap = false }) {
+  if (!hasDisplayValue(value)) return null
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>{label}</label>
+      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A', whiteSpace: preWrap ? 'pre-wrap' : 'normal' }}>{value}</p>
+    </div>
+  )
+}
 
 const sheetInputStyle = {
   width: '100%',
@@ -150,6 +166,7 @@ function PhotoUploadField({ previewUrl, onFileSelect, uploadInputRef, cameraInpu
 export default function AnimalProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { role } = useContext(AuthContext)
 
   const [animal, setAnimal] = useState(null)
@@ -159,7 +176,7 @@ export default function AnimalProfile() {
   const [reports, setReports] = useState([])
   const [surgeries, setSurgeries] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('details')
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'details')
   const [selectedPhoto, setSelectedPhoto] = useState(null)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
 
@@ -696,12 +713,28 @@ export default function AnimalProfile() {
   const months = ageMonths % 12
 
   const tabs = [
-    { key: 'details', label: 'Observation' },
-    { key: 'medical', label: 'Medical Record' },
-    { key: 'surgery', label: 'Surgery' },
-    { key: 'treatment', label: 'Treatment Sheet' },
-    { key: 'reports', label: 'Reports' },
+    { key: 'details', label: 'Observation', icon: Eye },
+    { key: 'medical', label: 'Medical Record', icon: Stethoscope },
+    { key: 'surgery', label: 'Surgery', icon: Scissors },
+    { key: 'treatment', label: 'Treatment Sheet', icon: ClipboardList },
+    { key: 'reports', label: 'Reports', icon: FileText },
   ]
+
+  const speciesBreedLine = [animal.species, animal.breed].filter(hasDisplayValue).join(' • ')
+  const ageDisplay = ageMonths > 0 ? `${years}y ${months}m` : null
+  const canEdit = role && (role === 'admin' || role === 'doctor')
+
+  const actionButtonStyle = {
+    background: '#F5F5F5',
+    border: 'none',
+    borderRadius: '10px',
+    width: '36px',
+    height: '36px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
@@ -765,29 +798,19 @@ export default function AnimalProfile() {
       </div>
 
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
-        <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', position: 'relative' }}>
-          {role && (role === 'admin' || role === 'doctor') && (
-            <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-              <button
-                onClick={() => navigate('/register', { state: { animal } })}
-                style={{ background: '#F5F5F5', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="Edit animal"
-              >
-                <Pencil size={17} color="#555" />
-              </button>
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                style={{ background: '#FEE2E2', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="Delete animal"
-              >
-                <Trash2 size={17} color="#EF4444" />
-              </button>
-            </div>
-          )}
-
+        <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ flex: 1, minWidth: '140px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '12px',
+                justifyContent: 'center',
+                maxWidth: '82%',
+                margin: '0 auto',
+              }}
+            >
+              <div style={{ flex: '1 1 115px', maxWidth: '160px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>On admission</label>
                 {photos.length > 0 ? (
                   <div
@@ -805,7 +828,7 @@ export default function AnimalProfile() {
                   </div>
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: '140px' }}>
+              <div style={{ flex: '1 1 115px', maxWidth: '160px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>On Release</label>
                 {animal.recovery_photo_url ? (
                   <div
@@ -825,48 +848,61 @@ export default function AnimalProfile() {
                     + Add On Release<br/>Photo
                   </div>
                 )}
+                {canEdit && (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
+                    <button
+                      onClick={() => navigate('/register', { state: { animal } })}
+                      style={actionButtonStyle}
+                      aria-label="Edit animal"
+                    >
+                      <Pencil size={17} color="#555" />
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      style={{ ...actionButtonStyle, background: '#FEE2E2' }}
+                      aria-label="Delete animal"
+                    >
+                      <Trash2 size={17} color="#EF4444" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-            
-            {photos.length > 1 && (
-              <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', scrollBehavior: 'smooth' }}>
-                {photos.slice(1, 4).map((p, i) => (
-                  <img
-                    key={i}
-                    src={p.photo_url}
-                    alt=""
-                    onClick={() => {
-                      setSelectedPhoto(p)
-                      setShowPhotoModal(true)
-                    }}
-                    style={{ width: '40px', height: '40px', borderRadius: '4px', cursor: 'pointer', objectFit: 'cover' }}
-                  />
-                ))}
-              </div>
-            )}
 
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</h2>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>{animal.animal_id}</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
-                {animal.species} • {animal.breed}
-              </p>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px' }}>
+                <span>{animal.name}</span>
+                {hasDisplayValue(animal.animal_id) && (
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#999' }}>{animal.animal_id}</span>
+                )}
+              </h2>
+              {speciesBreedLine && (
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
+                  {speciesBreedLine}
+                </p>
+              )}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{animal.gender}</span>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    backgroundColor: getStatusColor(animal.current_status),
-                    color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {animal.current_status}
-                </span>
-                <span style={{ display: 'inline-block', backgroundColor: '#E0E0E0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{getWardLabel(animal.ward)}</span>
+                {hasDisplayValue(animal.gender) && (
+                  <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{animal.gender}</span>
+                )}
+                {hasDisplayValue(animal.current_status) && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      backgroundColor: getStatusColor(animal.current_status),
+                      color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {animal.current_status}
+                  </span>
+                )}
+                {hasDisplayValue(animal.ward) && (
+                  <span style={{ display: 'inline-block', backgroundColor: '#E0E0E0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{getWardLabel(animal.ward)}</span>
+                )}
               </div>
               
               <hr style={{ border: 'none', borderTop: '1px solid #E0E0E0', margin: '16px 0' }} />
@@ -885,8 +921,9 @@ export default function AnimalProfile() {
                       onClick={() => handleHealthTagClick(tagKey)}
                       style={{
                         display: 'inline-block',
-                        backgroundColor: '#F5F5F5',
-                        color: '#1A1A1A',
+                        backgroundColor: isDone ? '#DCFCE7' : '#FEE2E2',
+                        color: isDone ? '#166534' : '#991B1B',
+                        border: `1px solid ${isDone ? '#22C55E' : '#FCA5A5'}`,
                         padding: '4px 8px',
                         borderRadius: '50px',
                         fontSize: '12px',
@@ -903,103 +940,85 @@ export default function AnimalProfile() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', padding: '0 12px', borderBottom: '2px solid #E0E0E0', backgroundColor: '#FFFFFF', position: 'sticky', top: 0, zIndex: 10, overflowX: 'auto' }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                flex: 1,
-                minWidth: '96px',
-                padding: '14px 12px',
-                border: 'none',
-                backgroundColor: 'transparent',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: activeTab === tab.key ? 'bold' : 'normal',
-                borderBottom: activeTab === tab.key ? '3px solid #F5C800' : 'none',
-                color: activeTab === tab.key ? '#F5C800' : '#666',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '8px', padding: '0 12px', borderBottom: '2px solid #E0E0E0', backgroundColor: '#FFFFFF', position: 'sticky', top: 0, zIndex: 10, overflowX: 'auto' }}>
+          {tabs.map((tab) => {
+            const TabIcon = tab.icon
+            const isActive = activeTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  flex: 1,
+                  minWidth: '72px',
+                  padding: '10px 8px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: isActive ? 'bold' : 'normal',
+                  borderBottom: isActive ? '3px solid #F5C800' : '3px solid transparent',
+                  color: isActive ? '#F5C800' : '#666',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <TabIcon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                {tab.label}
+              </button>
+            )
+          })}
         </div>
 
         <div style={{ padding: '16px' }}>
           {activeTab === 'details' && (
             <div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescue Date</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_date || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Admission Date</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.admission_date || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescue Location</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_location || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Age</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>
-                  {years}y {months}m
-                </p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Colour / Marks</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.colour || '—'}</p>
-              </div>
-              {animal.ward && animal.ward.toLowerCase() !== 'opd' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
-                </div>
+              <ObservationField label="Rescue Date" value={animal.rescue_date ? formatDisplayDate(animal.rescue_date) : null} />
+              <ObservationField label="Rescue Location" value={animal.rescue_location} />
+              <ObservationField label="Age" value={ageDisplay} />
+              <ObservationField label="Colour / Marks" value={animal.colour} />
+              {animal.ward && animal.ward.toLowerCase() !== 'opd' && hasDisplayValue(animal.category) && (
+                <ObservationField label="Category" value={getCategoryLabel(animal.category)} />
               )}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>LSS Incharge</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.lss_incharge || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reason for Admission</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reason_for_admission || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Current Condition</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>{animal.initial_assessment || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescuer / Reporter</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescuer_type || 'Rescued Animal'}</p>
-              </div>
+              <ObservationField label="LSS Incharge" value={animal.lss_incharge} />
+              <ObservationField label="Reason for Admission" value={animal.reason_for_admission} />
+              <ObservationField label="Current Condition" value={animal.initial_assessment} preWrap />
+              <ObservationField label="Rescuer / Reporter" value={animal.rescuer_type} />
               {animal.rescuer_type === 'Animal Bought by Reporter' && (
-                <div style={{ marginBottom: '16px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Name:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_name || '—'}</p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Address:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_address || '—'}</p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Phone:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_phone || '—'}</p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Aadhaar URL:</span>
-                      {animal.reporter_aadhaar_url ? (
-                        <a href={animal.reporter_aadhaar_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>View Aadhaar</a>
-                      ) : (
-                        <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>—</p>
+                (hasDisplayValue(animal.reporter_name) || hasDisplayValue(animal.reporter_address) || hasDisplayValue(animal.reporter_phone) || hasDisplayValue(animal.reporter_aadhaar_url)) && (
+                  <div style={{ marginBottom: '16px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {hasDisplayValue(animal.reporter_name) && (
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#666' }}>Name:</span>
+                          <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_name}</p>
+                        </div>
+                      )}
+                      {hasDisplayValue(animal.reporter_address) && (
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#666' }}>Address:</span>
+                          <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_address}</p>
+                        </div>
+                      )}
+                      {hasDisplayValue(animal.reporter_phone) && (
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#666' }}>Phone:</span>
+                          <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_phone}</p>
+                        </div>
+                      )}
+                      {hasDisplayValue(animal.reporter_aadhaar_url) && (
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#666' }}>Aadhaar:</span>
+                          <a href={animal.reporter_aadhaar_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>View Aadhaar</a>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
+                )
               )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Update Status</label>
