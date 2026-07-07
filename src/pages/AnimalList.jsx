@@ -302,19 +302,21 @@ export default function AnimalList({ ward = 'opd' }) {
                   {animal.animal_id}
                 </p>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      background: getStatusColor(animal.current_status),
-                      color: '#FFF',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {animal.current_status ? animal.current_status.charAt(0).toUpperCase() + animal.current_status.slice(1) : 'N/A'}
-                  </span>
+                  {animal.current_status && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        background: getStatusColor(animal.current_status),
+                        color: '#FFF',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {animal.current_status.charAt(0).toUpperCase() + animal.current_status.slice(1)}
+                    </span>
+                  )}
                 </div>
                 <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
                   {animal.species} {animal.breed ? `• ${animal.breed}` : ''}

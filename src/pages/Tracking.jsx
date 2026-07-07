@@ -232,18 +232,20 @@ export default function Tracking() {
                 </div>
 
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                  <span
-                    style={{
-                      backgroundColor: getStatusColor(animal.current_status),
-                      color: ['critical', 'moderate'].includes(animal.current_status?.toLowerCase()) ? '#FFFFFF' : '#000000',
-                      padding: '4px 8px',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {animal.current_status || 'Unknown'}
-                  </span>
+                  {animal.current_status && (
+                    <span
+                      style={{
+                        backgroundColor: getStatusColor(animal.current_status),
+                        color: ['critical', 'moderate'].includes(animal.current_status?.toLowerCase()) ? '#FFFFFF' : '#000000',
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {animal.current_status}
+                    </span>
+                  )}
                   <ChevronRight size={20} color="#BBBBBB" />
                 </div>
               </div>

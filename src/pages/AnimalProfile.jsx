@@ -3,7 +3,7 @@ import { useEffect, useState, useContext, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
-import { ArrowLeft, Pencil, Trash2, Eye, Activity, Syringe, Bandage, FileText } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Eye, Activity, Syringe, Bandage, FileText, Mars, Venus, FlaskConical, BugOff, Scissors } from 'lucide-react'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -19,16 +19,67 @@ const getCategoryLabel = (cat) => {
   if (!cat) return ''
   const labels = {
     normal: 'Normal',
-    paralysed: 'Paralyzed',
+    paralysed: 'Paralysed',
     blind: 'Blind',
     neurological: 'Neurological',
-    behavioural: 'Behavioral',
+    behavioural: 'Behavioural Problems',
     senior: 'Senior Care',
     disabled: 'Disabled',
-    chemo: 'Chemo',
+    chemo: 'Chemo'
   }
-  return labels[cat] || cat
+  return labels[cat.toLowerCase()] || cat
 }
+
+const StatusChip = ({ label, icon: Icon, isSelected, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      borderRadius: '10px',
+      border: 'none',
+      backgroundColor: isSelected ? '#2E9E5B' : '#F4F4F4',
+      cursor: 'pointer',
+      transition: 'all 200ms ease',
+      width: '100%',
+      justifyContent: 'center'
+    }}
+  >
+    <Icon size={16} color={isSelected ? '#FFFFFF' : '#6B6B6B'} style={{ transition: 'color 200ms ease' }} />
+    <span style={{ 
+      fontSize: '13px', 
+      fontWeight: '600', 
+      color: isSelected ? '#FFFFFF' : '#6B6B6B',
+      transition: 'color 200ms ease',
+      textAlign: 'left'
+    }}>
+      {label}
+    </span>
+  </button>
+)
+
+const MedicalActionBtn = ({ label, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #EAEAEA',
+      borderRadius: '12px',
+      borderTop: '3px solid #F2C230',
+      padding: '10px 8px',
+      fontSize: '13px',
+      fontWeight: '500',
+      color: '#1A1A1A',
+      textAlign: 'center',
+      cursor: 'pointer',
+      width: '100%'
+    }}
+  >
+    {label}
+  </button>
+)
 
 const getWardLabel = (ward) => {
   const labels = { opd: 'OPD', ipd: 'IPD', inhouse: 'In-House' }
@@ -69,10 +120,10 @@ const primaryButtonStyle = {
   backgroundColor: '#F5C800',
   border: 'none',
   borderRadius: '50px',
-  fontWeight: 'bold',
+  fontWeight: '500',
   fontSize: '14px',
   cursor: 'pointer',
-  color: '#000',
+  color: '#1A1A1A',
 }
 
 function BottomSheet({ title, onClose, children }) {
@@ -830,7 +881,16 @@ export default function AnimalProfile() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                   <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>{animal.animal_id}</p>
+                  <span style={{ 
+                    backgroundColor: '#F4F4F4', 
+                    padding: '2px 8px', 
+                    borderRadius: '6px', 
+                    fontFamily: 'monospace', 
+                    fontSize: '12px', 
+                    color: '#8A8A8A' 
+                  }}>
+                    {animal.animal_id}
+                  </span>
                 </div>
                 {role && (role === 'admin' || role === 'doctor') && (
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -855,61 +915,59 @@ export default function AnimalProfile() {
                 {animal.species} • {animal.breed}
               </p>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{animal.gender}</span>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    backgroundColor: getStatusColor(animal.current_status),
-                    color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {animal.current_status}
+                <span style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: '#F4F4F4', 
+                  padding: '3px 10px', 
+                  borderRadius: '12px', 
+                  fontSize: '12px',
+                  color: '#1A1A1A'
+                }}>
+                  {animal.gender?.toLowerCase() === 'male' && <Mars size={12} color="#1A1A1A" />}
+                  {animal.gender?.toLowerCase() === 'female' && <Venus size={12} color="#1A1A1A" />}
+                  <span style={{ textTransform: 'capitalize' }}>{animal.gender}</span>
                 </span>
+                {animal.current_status && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      backgroundColor: getStatusColor(animal.current_status),
+                      color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {animal.current_status}
+                  </span>
+                )}
                 <span style={{ display: 'inline-block', backgroundColor: '#E0E0E0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{getWardLabel(animal.ward)}</span>
               </div>
               
-              <div style={{ display: 'flex' }}>
-                {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map((tagKey, index) => {
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map((tagKey) => {
                   const info = animal.health_info?.[tagKey]
                   const config = getHealthTagConfig(tagKey)
                   const isDone = config.fieldLabel === null 
                     ? (info?.status === 'Yes')
                     : (info?.status === 'Yes' && !!info?.medicineName && info.medicineName.trim() !== '')
 
+                  let Icon = Syringe
+                  if (tagKey === 'rabies') Icon = FlaskConical
+                  if (tagKey === 'dewormed') Icon = BugOff
+                  if (tagKey === 'sterilized') Icon = Scissors
+
                   return (
-                    <div
+                    <StatusChip
                       key={tagKey}
+                      label={config.label}
+                      icon={Icon}
+                      isSelected={isDone}
                       onClick={() => handleHealthTagClick(tagKey)}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        borderRight: index < 3 ? '1px solid #E0E0E0' : 'none',
-                        textAlign: 'center'
-                      }}
-                    >
-                      <div style={{
-                        width: '14px', height: '14px', borderRadius: '50%',
-                        backgroundColor: isDone ? '#22C55E' : '#EF4444',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        marginBottom: '6px'
-                      }}>
-                        {isDone ? (
-                          <span style={{ color: '#FFF', fontSize: '10px', lineHeight: 1 }}>✓</span>
-                        ) : (
-                          <span style={{ color: '#FFF', fontSize: '10px', lineHeight: 1 }}>✕</span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '10px', color: '#999', fontWeight: 600, lineHeight: 1.2 }}>{config.label}</span>
-                    </div>
+                    />
                   )
                 })}
               </div>
@@ -1056,12 +1114,10 @@ export default function AnimalProfile() {
 
           {activeTab === 'medical' && (
             <div>
-              <button onClick={() => setShowMedicalForm(true)} style={{ ...primaryButtonStyle, marginBottom: '8px' }}>
-                  + Add Medical Record
-                </button>
-                <button onClick={() => setShowRequestTreatmentForm(true)} style={{ ...primaryButtonStyle, backgroundColor: '#F5C800', marginBottom: '16px' }}>
-                  Request Treatment
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowMedicalForm(true)} label="Add medical record" />
+                <MedicalActionBtn onClick={() => setShowRequestTreatmentForm(true)} label="Request treatment" />
+              </div>
                 {showRequestTreatmentForm && (
                   <BottomSheet title="Request Treatment" onClose={() => !requestSaving && setShowRequestTreatmentForm(false)}>
                     <div style={{ marginBottom: '12px' }}>
@@ -1103,9 +1159,9 @@ export default function AnimalProfile() {
           {activeTab === 'surgery' && (
             <div>
               {role && (role === 'admin' || role === 'doctor') && (
-                <button onClick={() => setShowSurgeryForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                  + Add Surgery
-                </button>
+                <div style={{ marginBottom: '16px' }}>
+                  <MedicalActionBtn onClick={() => setShowSurgeryForm(true)} label="Add surgery" />
+                </div>
               )}
               {surgeries.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No surgeries yet</p>
@@ -1142,9 +1198,9 @@ export default function AnimalProfile() {
 
           {activeTab === 'treatment' && (
             <div>
-              <button onClick={() => setShowTreatmentSheetForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                + Upload Treatment Sheet
-              </button>
+              <div style={{ marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowTreatmentSheetForm(true)} label="Upload treatment sheet" />
+              </div>
               {treatmentSheets.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No treatment sheets yet</p>
               ) : (
@@ -1168,9 +1224,9 @@ export default function AnimalProfile() {
           {activeTab === 'reports' && (
             <div>
               <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#999999' }}>Upload X-Rays / Blood Tests / Ultrasound Reports</p>
-              <button onClick={() => setShowReportForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                + Upload Report
-              </button>
+              <div style={{ marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowReportForm(true)} label="Upload report" />
+              </div>
               {reports.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No reports yet</p>
               ) : (
