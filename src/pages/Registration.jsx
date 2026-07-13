@@ -45,6 +45,8 @@ export default function Registration() {
   const [activeUploadField, setActiveUploadField] = useState(null)
   const uploadInputRef = useRef(null)
   const cameraInputRef = useRef(null)
+  const animalCameraInputRef = useRef(null)
+  const animalUploadInputRef = useRef(null)
   const [formData, setFormData] = useState({
     name: '',
     species: 'dog',
@@ -967,13 +969,60 @@ export default function Registration() {
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
             Add Photos
           </label>
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handlePhotoChange}
-            style={{ marginBottom: '12px' }}
-          />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+            <button
+              type="button"
+              onClick={() => animalUploadInputRef.current?.click()}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid #E0E0E0',
+                backgroundColor: '#F0F0F0',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+                textAlign: 'center',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Choose Files
+            </button>
+            <input
+              ref={animalUploadInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handlePhotoChange}
+            />
+            <button
+              type="button"
+              onClick={() => animalCameraInputRef.current?.click()}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid #E0E0E0',
+                backgroundColor: '#F0F0F0',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+                textAlign: 'center',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Take Photo
+            </button>
+            <input
+              ref={animalCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={handlePhotoChange}
+            />
+          </div>
           {photoPreviews.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px' }}>
               {photoPreviews.map((preview, idx) => (

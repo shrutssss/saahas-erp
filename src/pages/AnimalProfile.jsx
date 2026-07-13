@@ -3,7 +3,7 @@ import { useEffect, useState, useContext, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Eye, Activity, Syringe, Bandage, FileText, Mars, Venus, FlaskConical, BugOff, Scissors } from 'lucide-react'
 
 const getStatusColor = (status) => {
   if (!status) return '#E0E0E0'
@@ -19,16 +19,67 @@ const getCategoryLabel = (cat) => {
   if (!cat) return ''
   const labels = {
     normal: 'Normal',
-    paralysed: 'Paralyzed',
+    paralysed: 'Paralysed',
     blind: 'Blind',
     neurological: 'Neurological',
-    behavioural: 'Behavioral',
+    behavioural: 'Behavioural Problems',
     senior: 'Senior Care',
     disabled: 'Disabled',
-    chemo: 'Chemo',
+    chemo: 'Chemo'
   }
-  return labels[cat] || cat
+  return labels[cat.toLowerCase()] || cat
 }
+
+const StatusChip = ({ label, icon: Icon, isSelected, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      borderRadius: '10px',
+      border: 'none',
+      backgroundColor: isSelected ? '#2E9E5B' : '#F4F4F4',
+      cursor: 'pointer',
+      transition: 'all 200ms ease',
+      width: '100%',
+      justifyContent: 'center'
+    }}
+  >
+    <Icon size={16} color={isSelected ? '#FFFFFF' : '#6B6B6B'} style={{ transition: 'color 200ms ease' }} />
+    <span style={{ 
+      fontSize: '13px', 
+      fontWeight: '600', 
+      color: isSelected ? '#FFFFFF' : '#6B6B6B',
+      transition: 'color 200ms ease',
+      textAlign: 'left'
+    }}>
+      {label}
+    </span>
+  </button>
+)
+
+const MedicalActionBtn = ({ label, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #EAEAEA',
+      borderRadius: '12px',
+      borderTop: '3px solid #F2C230',
+      padding: '10px 8px',
+      fontSize: '13px',
+      fontWeight: '500',
+      color: '#1A1A1A',
+      textAlign: 'center',
+      cursor: 'pointer',
+      width: '100%'
+    }}
+  >
+    {label}
+  </button>
+)
 
 const getWardLabel = (ward) => {
   const labels = { opd: 'OPD', ipd: 'IPD', inhouse: 'In-House' }
@@ -69,10 +120,10 @@ const primaryButtonStyle = {
   backgroundColor: '#F5C800',
   border: 'none',
   borderRadius: '50px',
-  fontWeight: 'bold',
+  fontWeight: '500',
   fontSize: '14px',
   cursor: 'pointer',
-  color: '#000',
+  color: '#1A1A1A',
 }
 
 function BottomSheet({ title, onClose, children }) {
@@ -696,11 +747,11 @@ export default function AnimalProfile() {
   const months = ageMonths % 12
 
   const tabs = [
-    { key: 'details', label: 'Observation' },
-    { key: 'medical', label: 'Medical Record' },
-    { key: 'surgery', label: 'Surgery' },
-    { key: 'treatment', label: 'Treatment Sheet' },
-    { key: 'reports', label: 'Reports' },
+    { key: 'details', label: 'Observation', Icon: Eye },
+    { key: 'medical', label: 'Medical Record', Icon: Activity },
+    { key: 'surgery', label: 'Surgery', Icon: Syringe },
+    { key: 'treatment', label: 'Treatment Sheet', Icon: Bandage },
+    { key: 'reports', label: 'Reports', Icon: FileText },
   ]
 
   return (
@@ -765,26 +816,7 @@ export default function AnimalProfile() {
       </div>
 
       <main style={{ flex: 1, paddingBottom: '100px', backgroundColor: '#FFFFFF' }}>
-        <div style={{ padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', position: 'relative' }}>
-          {role && (role === 'admin' || role === 'doctor') && (
-            <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-              <button
-                onClick={() => navigate('/register', { state: { animal } })}
-                style={{ background: '#F5F5F5', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="Edit animal"
-              >
-                <Pencil size={17} color="#555" />
-              </button>
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                style={{ background: '#FEE2E2', border: 'none', borderRadius: '10px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                aria-label="Delete animal"
-              >
-                <Trash2 size={17} color="#EF4444" />
-              </button>
-            </div>
-          )}
-
+        <div style={{ padding: '16px', paddingBottom: '24px', backgroundColor: '#FFFFFF', borderBottom: 'none', position: 'relative' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ flex: 1, minWidth: '140px' }}>
@@ -805,7 +837,7 @@ export default function AnimalProfile() {
                   </div>
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: '140px' }}>
+              <div style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', textAlign: 'center' }}>On Release</label>
                 {animal.recovery_photo_url ? (
                   <div
@@ -820,7 +852,7 @@ export default function AnimalProfile() {
                 ) : (
                   <div
                     onClick={() => setShowRecoveryModal(true)}
-                    style={{ cursor: 'pointer', width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F8F8F8', border: '1px dashed #D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#999', textAlign: 'center', padding: '8px' }}
+                    style={{ cursor: 'pointer', width: '100%', aspectRatio: '1/1', borderRadius: '12px', backgroundColor: '#F8F8F8', border: '1px dashed #D0D0D0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#999', textAlign: 'center', padding: '8px', flex: 1 }}
                   >
                     + Add On Release<br/>Photo
                   </div>
@@ -846,56 +878,96 @@ export default function AnimalProfile() {
             )}
 
             <div>
-              <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</h2>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#999' }}>{animal.animal_id}</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#1A1A1A' }}>{animal.name}</h2>
+                  <span style={{ 
+                    backgroundColor: '#F4F4F4', 
+                    padding: '2px 8px', 
+                    borderRadius: '6px', 
+                    fontFamily: 'monospace', 
+                    fontSize: '12px', 
+                    color: '#8A8A8A' 
+                  }}>
+                    {animal.animal_id}
+                  </span>
+                </div>
+                {role && (role === 'admin' || role === 'doctor') && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => navigate('/register', { state: { animal } })}
+                      style={{ background: '#F5F5F5', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      aria-label="Edit animal"
+                    >
+                      <Pencil size={15} color="#555" />
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      style={{ background: '#FEE2E2', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      aria-label="Delete animal"
+                    >
+                      <Trash2 size={15} color="#EF4444" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
                 {animal.species} • {animal.breed}
               </p>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ display: 'inline-block', backgroundColor: '#F0F0F0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{animal.gender}</span>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    backgroundColor: getStatusColor(animal.current_status),
-                    color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {animal.current_status}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                <span style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: '#F4F4F4', 
+                  padding: '3px 10px', 
+                  borderRadius: '12px', 
+                  fontSize: '12px',
+                  color: '#1A1A1A'
+                }}>
+                  {animal.gender?.toLowerCase() === 'male' && <Mars size={12} color="#1A1A1A" />}
+                  {animal.gender?.toLowerCase() === 'female' && <Venus size={12} color="#1A1A1A" />}
+                  <span style={{ textTransform: 'capitalize' }}>{animal.gender}</span>
                 </span>
+                {animal.current_status && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      backgroundColor: getStatusColor(animal.current_status),
+                      color: animal.current_status === 'critical' || animal.current_status === 'moderate' ? '#FFF' : '#000',
+                      padding: '4px 8px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {animal.current_status}
+                  </span>
+                )}
                 <span style={{ display: 'inline-block', backgroundColor: '#E0E0E0', padding: '4px 8px', borderRadius: '12px', fontSize: '12px' }}>{getWardLabel(animal.ward)}</span>
               </div>
               
-              <hr style={{ border: 'none', borderTop: '1px solid #E0E0E0', margin: '16px 0' }} />
-              
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map(tagKey => {
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {['vaccinated', 'rabies', 'dewormed', 'sterilized'].map((tagKey) => {
                   const info = animal.health_info?.[tagKey]
                   const config = getHealthTagConfig(tagKey)
                   const isDone = config.fieldLabel === null 
                     ? (info?.status === 'Yes')
                     : (info?.status === 'Yes' && !!info?.medicineName && info.medicineName.trim() !== '')
 
+                  let Icon = Syringe
+                  if (tagKey === 'rabies') Icon = FlaskConical
+                  if (tagKey === 'dewormed') Icon = BugOff
+                  if (tagKey === 'sterilized') Icon = Scissors
+
                   return (
-                    <span
+                    <StatusChip
                       key={tagKey}
+                      label={config.label}
+                      icon={Icon}
+                      isSelected={isDone}
                       onClick={() => handleHealthTagClick(tagKey)}
-                      style={{
-                        display: 'inline-block',
-                        backgroundColor: '#F5F5F5',
-                        color: '#1A1A1A',
-                        padding: '4px 8px',
-                        borderRadius: '50px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {isDone ? '✓ ' : '✗ '}{config.label}
-                    </span>
+                    />
                   )
                 })}
               </div>
@@ -903,95 +975,110 @@ export default function AnimalProfile() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', padding: '0 12px', borderBottom: '2px solid #E0E0E0', backgroundColor: '#FFFFFF', position: 'sticky', top: 0, zIndex: 10, overflowX: 'auto' }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                flex: 1,
-                minWidth: '96px',
-                padding: '14px 12px',
-                border: 'none',
-                backgroundColor: 'transparent',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: activeTab === tab.key ? 'bold' : 'normal',
-                borderBottom: activeTab === tab.key ? '3px solid #F5C800' : 'none',
-                color: activeTab === tab.key ? '#F5C800' : '#666',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', borderBottom: '1px solid #E0E0E0', backgroundColor: '#FFFFFF', position: 'sticky', top: 0, zIndex: 10 }}>
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  padding: '10px 4px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  color: isActive ? '#F5C800' : '#666',
+                  borderBottom: isActive ? '3px solid #F5C800' : '3px solid transparent',
+                  position: 'relative'
+                }}
+              >
+                <tab.Icon size={18} color="#999" style={{ marginBottom: '6px' }} />
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: isActive ? 'bold' : '600',
+                  lineHeight: 1.2,
+                  textAlign: 'center',
+                  whiteSpace: 'normal',
+                  wordWrap: 'break-word',
+                  maxWidth: '100%'
+                }}>
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
         <div style={{ padding: '16px' }}>
           {activeTab === 'details' && (
             <div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescue Date</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Rescue Date</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_date || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Admission Date</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Admission Date</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.admission_date || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescue Location</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Rescue Location</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_location || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Age</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Age</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>
                   {years}y {months}m
                 </p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Colour / Marks</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Colour / Marks</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.colour || '—'}</p>
               </div>
               {animal.ward && animal.ward.toLowerCase() !== 'opd' && (
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Category</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Category</label>
                   <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{getCategoryLabel(animal.category)}</p>
                 </div>
               )}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>LSS Incharge</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>LSS Incharge</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.lss_incharge || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Reason for Admission</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Reason for Admission</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reason_for_admission || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Current Condition</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Current Condition</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A', whiteSpace: 'pre-wrap' }}>{animal.initial_assessment || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Rescuer / Reporter</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Rescuer / Reporter</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescuer_type || 'Rescued Animal'}</p>
               </div>
               {animal.rescuer_type === 'Animal Bought by Reporter' && (
                 <div style={{ marginBottom: '16px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Name:</span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>Name:</span>
                       <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_name || '—'}</p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Address:</span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>Address:</span>
                       <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_address || '—'}</p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Phone:</span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>Phone:</span>
                       <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_phone || '—'}</p>
                     </div>
                     <div>
-                      <span style={{ fontSize: '12px', color: '#666' }}>Aadhaar URL:</span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>Aadhaar URL:</span>
                       {animal.reporter_aadhaar_url ? (
                         <a href={animal.reporter_aadhaar_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>View Aadhaar</a>
                       ) : (
@@ -1027,12 +1114,10 @@ export default function AnimalProfile() {
 
           {activeTab === 'medical' && (
             <div>
-              <button onClick={() => setShowMedicalForm(true)} style={{ ...primaryButtonStyle, marginBottom: '8px' }}>
-                  + Add Medical Record
-                </button>
-                <button onClick={() => setShowRequestTreatmentForm(true)} style={{ ...primaryButtonStyle, backgroundColor: '#F5C800', marginBottom: '16px' }}>
-                  Request Treatment
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowMedicalForm(true)} label="Add medical record" />
+                <MedicalActionBtn onClick={() => setShowRequestTreatmentForm(true)} label="Request treatment" />
+              </div>
                 {showRequestTreatmentForm && (
                   <BottomSheet title="Request Treatment" onClose={() => !requestSaving && setShowRequestTreatmentForm(false)}>
                     <div style={{ marginBottom: '12px' }}>
@@ -1074,9 +1159,9 @@ export default function AnimalProfile() {
           {activeTab === 'surgery' && (
             <div>
               {role && (role === 'admin' || role === 'doctor') && (
-                <button onClick={() => setShowSurgeryForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                  + Add Surgery
-                </button>
+                <div style={{ marginBottom: '16px' }}>
+                  <MedicalActionBtn onClick={() => setShowSurgeryForm(true)} label="Add surgery" />
+                </div>
               )}
               {surgeries.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No surgeries yet</p>
@@ -1113,9 +1198,9 @@ export default function AnimalProfile() {
 
           {activeTab === 'treatment' && (
             <div>
-              <button onClick={() => setShowTreatmentSheetForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                + Upload Treatment Sheet
-              </button>
+              <div style={{ marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowTreatmentSheetForm(true)} label="Upload treatment sheet" />
+              </div>
               {treatmentSheets.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No treatment sheets yet</p>
               ) : (
@@ -1139,9 +1224,9 @@ export default function AnimalProfile() {
           {activeTab === 'reports' && (
             <div>
               <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#999999' }}>Upload X-Rays / Blood Tests / Ultrasound Reports</p>
-              <button onClick={() => setShowReportForm(true)} style={{ ...primaryButtonStyle, marginBottom: '16px' }}>
-                + Upload Report
-              </button>
+              <div style={{ marginBottom: '16px' }}>
+                <MedicalActionBtn onClick={() => setShowReportForm(true)} label="Upload report" />
+              </div>
               {reports.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666', padding: '20px 0' }}>No reports yet</p>
               ) : (
