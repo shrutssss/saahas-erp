@@ -74,6 +74,8 @@ export default function Tracking() {
       case 'moderate': return '#F59E0B'
       case 'stable': return '#22C55E'
       case 'recovered': return '#3B82F6'
+      case 'released': return '#3B82F6'
+      case 'adopted': return '#8B5CF6'
       case 'deceased': return '#6B7280'
       default: return '#9CA3AF'
     }

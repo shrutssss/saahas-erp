@@ -111,6 +111,8 @@ export default function AnimalList({ ward = 'opd' }) {
     if (s === 'critical') return '#EF4444'
     if (s === 'moderate') return '#F97316'
     if (s === 'stable') return '#22C55E'
+    if (s === 'released') return '#3B82F6'
+    if (s === 'adopted') return '#8B5CF6'
     return '#999'
   }
 

@@ -12,6 +12,8 @@ const getStatusColor = (status) => {
   if (s === 'moderate') return '#F97316'
   if (s === 'stable') return '#22C55E'
   if (s === 'recovered') return '#22C55E'
+  if (s === 'released') return '#3B82F6'
+  if (s === 'adopted') return '#8B5CF6'
   return '#E0E0E0'
 }
 
@@ -91,6 +93,79 @@ const formatDisplayDate = (value) => {
   const date = new Date(typeof value === 'string' && !value.includes('T') ? `${value}T00:00:00` : value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function DateInput({ value, onChange, label, required }) {
+  const [displayValue, setDisplayValue] = useState(() => {
+    if (!value) return ''
+    const parts = value.split('-')
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    return value
+  })
+
+  useEffect(() => {
+    if (!value) {
+      setDisplayValue('')
+      return
+    }
+
+    const parts = value.split('-')
+    if (parts.length === 3) {
+      setDisplayValue(`${parts[2]}/${parts[1]}/${parts[0]}`)
+      return
+    }
+
+    setDisplayValue(value)
+  }, [value])
+
+  const handleChange = (e) => {
+    let input = e.target.value
+    input = input.replace(/\D/g, '')
+    if (input.length >= 3 && input.length <= 4) {
+      input = input.slice(0, 2) + '/' + input.slice(2)
+    } else if (input.length >= 5) {
+      input = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8)
+    }
+
+    setDisplayValue(input)
+
+    const digits = input.replace(/\D/g, '')
+    if (digits.length === 8) {
+      const dd = input.slice(0, 2)
+      const mm = input.slice(3, 5)
+      const yyyy = input.slice(6, 10)
+      const isoDate = `${yyyy}-${mm}-${dd}`
+      const dateObj = new Date(isoDate)
+      if (!isNaN(dateObj.getTime())) {
+        onChange(isoDate)
+      }
+    } else if (digits.length === 0) {
+      onChange(null)
+    }
+  }
+
+  return (
+    <div>
+      {label && <label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 600 }}>{label}{required && ' *'}</label>}
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="DD/MM/YYYY"
+        value={displayValue}
+        onChange={handleChange}
+        maxLength={10}
+        style={{
+          width: '100%',
+          background: '#F0F0F0',
+          border: 'none',
+          borderRadius: 12,
+          padding: 14,
+          fontSize: 16,
+          fontFamily: 'inherit'
+        }}
+      />
+    </div>
+  )
 }
 
 const getReportTypeLabel = (type, customType) => {
@@ -413,7 +488,7 @@ export default function AnimalProfile() {
       if (animalRes.data) {
         setAnimal(animalRes.data)
         const status = animalRes.data.current_status
-        setStatusUpdate(['recovered', 'deceased'].includes(status) ? status : '')
+        setStatusUpdate(['recovered', 'released', 'adopted', 'deceased'].includes(status) ? status : '')
       }
       if (photosRes.data) setPhotos(photosRes.data)
       if (medicalRes.error) console.error('Error fetching medical records:', medicalRes.error)
@@ -1064,27 +1139,38 @@ export default function AnimalProfile() {
               {animal.rescuer_type === 'Animal Bought by Reporter' && (
                 <div style={{ marginBottom: '16px', backgroundColor: '#F8F8F8', padding: '12px', borderRadius: '8px', border: '1px solid #E0E0E0' }}>
                   <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '8px', fontWeight: 'bold' }}>Reporter Details</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#999' }}>Name:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_name || '—'}</p>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    
+                    {/* Left side — text details */}
+                    <div style={{ flex: 1 }}>
+                      <div><span style={{ color: '#888', fontSize: 13 }}>Name:</span>
+                        <p style={{ fontWeight: 600, margin: '2px 0 12px' }}>{animal.reporter_name}</p>
+                      </div>
+                      <div><span style={{ color: '#888', fontSize: 13 }}>Address:</span>
+                        <p style={{ fontWeight: 600, margin: '2px 0 12px' }}>{animal.reporter_address || '—'}</p>
+                      </div>
+                      <div><span style={{ color: '#888', fontSize: 13 }}>Phone:</span>
+                        <p style={{ fontWeight: 600, margin: '2px 0 12px' }}>{animal.reporter_phone || '—'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#999' }}>Address:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_address || '—'}</p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#999' }}>Phone:</span>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.reporter_phone || '—'}</p>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#999' }}>Aadhaar URL:</span>
-                      {animal.reporter_aadhaar_url ? (
-                        <a href={animal.reporter_aadhaar_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>View Aadhaar</a>
-                      ) : (
-                        <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>—</p>
-                      )}
-                    </div>
+
+                    {/* Right side — photo */}
+                    {animal.reporter_photo_url && (
+                      <div style={{ flexShrink: 0 }}>
+                        <img 
+                          src={animal.reporter_photo_url}
+                          alt="Reporter"
+                          style={{ 
+                            width: 100, 
+                            height: 100, 
+                            objectFit: 'cover', 
+                            borderRadius: 12,
+                            border: '2px solid #F5C800'
+                          }}
+                        />
+                      </div>
+                    )}
+
                   </div>
                 </div>
               )}
@@ -1098,6 +1184,8 @@ export default function AnimalProfile() {
                   >
                     <option value="">Select status</option>
                     <option value="recovered">Recovered</option>
+                    <option value="released">Released</option>
+                    <option value="adopted">Adopted</option>
                     <option value="deceased">Deceased</option>
                   </select>
                   <button
@@ -1268,13 +1356,11 @@ export default function AnimalProfile() {
         }}>
           <form onSubmit={handleAddSurgery}>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
-              <input
-                type="date"
+              <DateInput
+                label="Date"
                 required
                 value={surgeryForm.surgery_date}
-                onChange={(e) => setSurgeryForm({ ...surgeryForm, surgery_date: e.target.value })}
-                style={sheetInputStyle}
+                onChange={(value) => setSurgeryForm({ ...surgeryForm, surgery_date: value || '' })}
               />
             </div>
             <div style={{ marginBottom: '12px' }}>
@@ -1352,13 +1438,11 @@ export default function AnimalProfile() {
         <BottomSheet title="Add Medical Record" onClose={() => !medicalSaving && setShowMedicalForm(false)}>
           <form onSubmit={handleAddMedicalRecord}>
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
-              <input
-                type="date"
+              <DateInput
+                label="Date"
                 required
                 value={medicalForm.record_date}
-                onChange={(e) => setMedicalForm({ ...medicalForm, record_date: e.target.value })}
-                style={sheetInputStyle}
+                onChange={(value) => setMedicalForm({ ...medicalForm, record_date: value || '' })}
               />
             </div>
             <div style={{ marginBottom: '12px' }}>
@@ -1590,13 +1674,11 @@ export default function AnimalProfile() {
             {healthForm.status === 'Yes' && (
               <>
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Date</label>
-                  <input
-                    type="date"
+                  <DateInput
+                    label="Date"
                     required
                     value={healthForm.date}
-                    onChange={(e) => setHealthForm({ ...healthForm, date: e.target.value })}
-                    style={sheetInputStyle}
+                    onChange={(value) => setHealthForm({ ...healthForm, date: value || '' })}
                   />
                 </div>
                 {getHealthTagConfig(activeHealthTag)?.fieldLabel && (

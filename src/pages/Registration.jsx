@@ -3,6 +3,79 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { ArrowLeft } from 'lucide-react'
 
+function DateInput({ value, onChange, label, required }) {
+  const [displayValue, setDisplayValue] = useState(() => {
+    if (!value) return ''
+    const parts = value.split('-')
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    return value
+  })
+
+  useEffect(() => {
+    if (!value) {
+      setDisplayValue('')
+      return
+    }
+
+    const parts = value.split('-')
+    if (parts.length === 3) {
+      setDisplayValue(`${parts[2]}/${parts[1]}/${parts[0]}`)
+      return
+    }
+
+    setDisplayValue(value)
+  }, [value])
+
+  const handleChange = (e) => {
+    let input = e.target.value
+    input = input.replace(/\D/g, '')
+    if (input.length >= 3 && input.length <= 4) {
+      input = input.slice(0, 2) + '/' + input.slice(2)
+    } else if (input.length >= 5) {
+      input = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8)
+    }
+
+    setDisplayValue(input)
+
+    const digits = input.replace(/\D/g, '')
+    if (digits.length === 8) {
+      const dd = input.slice(0, 2)
+      const mm = input.slice(3, 5)
+      const yyyy = input.slice(6, 10)
+      const isoDate = `${yyyy}-${mm}-${dd}`
+      const dateObj = new Date(isoDate)
+      if (!isNaN(dateObj.getTime())) {
+        onChange(isoDate)
+      }
+    } else if (digits.length === 0) {
+      onChange(null)
+    }
+  }
+
+  return (
+    <div>
+      {label && <label style={{ display: 'block', marginBottom: 6, fontSize: 14, fontWeight: 600 }}>{label}{required && ' *'}</label>}
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="DD/MM/YYYY"
+        value={displayValue}
+        onChange={handleChange}
+        maxLength={10}
+        style={{
+          width: '100%',
+          background: '#F0F0F0',
+          border: 'none',
+          borderRadius: 12,
+          padding: 14,
+          fontSize: 16,
+          fontFamily: 'inherit'
+        }}
+      />
+    </div>
+  )
+}
+
 
 const primaryButtonStyle = {
   width: '100%',
@@ -39,12 +112,7 @@ export default function Registration() {
   const [loading, setLoading] = useState(false)
   const [notification, setNotification] = useState(null)
   
-  const [reporterPic, setReporterPic] = useState({ file: null, previewUrl: '' })
-  const [reporterAadhaar, setReporterAadhaar] = useState({ file: null, previewUrl: '' })
-  const [reporterDetailSheet, setReporterDetailSheet] = useState({ file: null, previewUrl: '' })
-  const [activeUploadField, setActiveUploadField] = useState(null)
-  const uploadInputRef = useRef(null)
-  const cameraInputRef = useRef(null)
+  const [reporterPhotoFile, setReporterPhotoFile] = useState(null)
   const animalCameraInputRef = useRef(null)
   const animalUploadInputRef = useRef(null)
   const [formData, setFormData] = useState({
@@ -147,9 +215,7 @@ export default function Registration() {
       reporter_phone: editAnimal.reporter_phone || '',
     })
     
-    if (editAnimal.reporter_photo_url) setReporterPic({ file: null, previewUrl: editAnimal.reporter_photo_url })
-    if (editAnimal.reporter_aadhaar_url) setReporterAadhaar({ file: null, previewUrl: editAnimal.reporter_aadhaar_url })
-    if (editAnimal.reporter_detail_sheet_url) setReporterDetailSheet({ file: null, previewUrl: editAnimal.reporter_detail_sheet_url })
+
     
     setAnimalId(editAnimal.animal_id || '')
   }, [editAnimal])
@@ -291,25 +357,30 @@ export default function Registration() {
   const CLOUDINARY_UPLOAD_PRESET = 'saahas_unsigned'
 
 
-  const handleReporterFileSelect = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const stateObj = { file, previewUrl: event.target.result }
-      if (activeUploadField === 'pic') setReporterPic(stateObj)
-      if (activeUploadField === 'aadhaar') setReporterAadhaar(stateObj)
-      if (activeUploadField === 'sheet') setReporterDetailSheet(stateObj)
-      setActiveUploadField(null)
+  const uploadReporterPhoto = async (file) => {
+    if (!file) return null
+    
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new Error('Only JPG, PNG, and WebP images are allowed')
     }
-    reader.readAsDataURL(file)
-  }
-
-  const removeReporterFile = (field) => {
-    if (field === 'pic') setReporterPic({ file: null, previewUrl: '' })
-    if (field === 'aadhaar') setReporterAadhaar({ file: null, previewUrl: '' })
-    if (field === 'sheet') setReporterDetailSheet({ file: null, previewUrl: '' })
+    
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', 'saahas_unsigned')
+    
+    const response = await fetch(
+      'https://api.cloudinary.com/v1_1/dtixpptzy/image/upload',
+      { method: 'POST', body: formData }
+    )
+    
+    if (!response.ok) {
+      const err = await response.json()
+      throw new Error(`Photo upload failed: ${err.error?.message}`)
+    }
+    
+    const data = await response.json()
+    return data.secure_url
   }
 
   const uploadToCloudinary = async (file) => {
@@ -354,14 +425,9 @@ export default function Registration() {
       }
 
 
-      let picUrl = reporterPic.previewUrl && !reporterPic.file ? reporterPic.previewUrl : null;
-      let aadhaarUrl = reporterAadhaar.previewUrl && !reporterAadhaar.file ? reporterAadhaar.previewUrl : null;
-      let detailSheetUrl = reporterDetailSheet.previewUrl && !reporterDetailSheet.file ? reporterDetailSheet.previewUrl : null;
-
-      if (formData.rescuer_type === 'Animal Bought by Reporter') {
-        if (reporterPic.file) picUrl = await uploadToCloudinary(reporterPic.file);
-        if (reporterAadhaar.file) aadhaarUrl = await uploadToCloudinary(reporterAadhaar.file);
-        if (reporterDetailSheet.file) detailSheetUrl = await uploadToCloudinary(reporterDetailSheet.file);
+      let reporterPhotoUrl = isEditMode && editAnimal?.reporter_photo_url ? editAnimal.reporter_photo_url : null;
+      if (formData.rescuer_type === 'Animal Bought by Reporter' && reporterPhotoFile) {
+        reporterPhotoUrl = await uploadReporterPhoto(reporterPhotoFile);
       }
       
       const animalPayload = {
@@ -374,7 +440,8 @@ export default function Registration() {
           (Number.parseInt(formData.years, 10) || 0) * 12 +
           (Number.parseInt(formData.months, 10) || 0),
         colour: formData.colour,
-        rescue_date: formData.rescue_date,
+        rescue_date: formData.rescue_date || null,
+        admission_date: formData.admission_date || new Date().toISOString().split('T')[0],
         rescue_location: formData.rescue_location,
         ward: formData.ward,
         category: formData.category,
@@ -385,9 +452,7 @@ export default function Registration() {
         reporter_name: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_name : null,
         reporter_address: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_address : null,
         reporter_phone: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_phone : null,
-        reporter_photo_url: picUrl,
-        reporter_aadhaar_url: aadhaarUrl,
-        reporter_detail_sheet_url: detailSheetUrl,
+        reporter_photo_url: reporterPhotoUrl || null,
       }
 
       let savedAnimalId = editAnimal?.id || null
@@ -717,21 +782,11 @@ export default function Registration() {
 
         {/* 8. Rescue Date */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Rescue Date
-          </label>
-          <input
-            type="date"
-            name="rescue_date"
+          <DateInput
+            label="Rescue Date"
             value={formData.rescue_date}
-            onChange={handleInputChange}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #E0E0E0',
-              borderRadius: '12px',
-              fontSize: '14px',
-            }}
+            onChange={(value) => setFormData({ ...formData, rescue_date: value || '' })}
+            required={false}
           />
         </div>
 
@@ -905,39 +960,44 @@ export default function Registration() {
               <input type="text" name="reporter_address" value={formData.reporter_address} onChange={handleInputChange} style={{ width: '100%', padding: '12px', border: '1px solid #E0E0E0', borderRadius: '12px', fontSize: '14px' }} />
             </div>
             
-            {/* New Image Upload Fields */}
-            {[
-              { id: 'pic', label: 'Upload Reporter Pic', state: reporterPic },
-              { id: 'aadhaar', label: 'Upload Reporter Aadhaar / ID', state: reporterAadhaar },
-              { id: 'sheet', label: 'Upload Reporter Detail Sheet', state: reporterDetailSheet }
-            ].map(field => (
-              <div key={field.id} style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-                  {field.label}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                Reporter Photo
+              </label>
+              <div>
+                <label style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: '#F5C800',
+                  color: '#000000',
+                  borderRadius: 50,
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none'
+                }}>
+                  📷 Upload Photo
+                  <input 
+                    type="file" 
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={(e) => setReporterPhotoFile(e.target.files[0])}
+                  />
                 </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveUploadField(field.id)}
-                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F0F0F0', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
-                  >
-                    Select Image
-                  </button>
-                  {field.state.previewUrl && (
-                    <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #E0E0E0' }}>
-                      <img src={field.state.previewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <button
-                        type="button"
-                        onClick={() => removeReporterFile(field.id)}
-                        style={{ position: 'absolute', top: 0, right: 0, background: 'red', color: 'white', border: 'none', borderRadius: '0 0 0 4px', width: '16px', height: '16px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
-            ))}
+              {reporterPhotoFile && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <img 
+                    src={URL.createObjectURL(reporterPhotoFile)} 
+                    alt="Preview" 
+                    style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #E0E0E0' }} 
+                  />
+                  <span style={{ fontSize: '12px', color: '#666' }}>{reporterPhotoFile.name}</span>
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -1087,36 +1147,7 @@ export default function Registration() {
         </button>
       </form>
 
-      <input ref={uploadInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleReporterFileSelect} />
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleReporterFileSelect} />
 
-      {activeUploadField && (
-        <BottomSheet
-          title={
-            activeUploadField === 'pic' ? 'Upload Reporter Pic' :
-            activeUploadField === 'aadhaar' ? 'Upload Reporter Aadhaar / ID' :
-            'Upload Reporter Detail Sheet'
-          }
-          onClose={() => setActiveUploadField(null)}
-        >
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              type="button"
-              onClick={() => { cameraInputRef.current?.click(); setActiveUploadField(null); }}
-              style={{ flex: 1, padding: '12px', backgroundColor: '#F0F0F0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              Take Pic
-            </button>
-            <button
-              type="button"
-              onClick={() => { uploadInputRef.current?.click(); setActiveUploadField(null); }}
-              style={{ flex: 1, padding: '12px', backgroundColor: '#F0F0F0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              Upload Pic
-            </button>
-          </div>
-        </BottomSheet>
-      )}
 
     </div>
   )

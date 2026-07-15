@@ -4,31 +4,323 @@ import { supabase } from '../supabaseClient'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
 import { LogOut, Menu, X, LayoutDashboard, Stethoscope, BedDouble, House, ClipboardList, PlusCircle } from 'lucide-react'
 
+const MONTHLY_STAT_ROWS = [
+  { key: 'admitted', label: 'Admitted' },
+  { key: 'released', label: 'Released' },
+  { key: 'deaths', label: 'Deaths' },
+  { key: 'blood_test', label: 'Blood Test' },
+  { key: 'xray', label: 'X-Ray' },
+  { key: 'surgery', label: 'Surgery' },
+  { key: 'opd', label: 'OPD' },
+  { key: 'rescue', label: 'Rescue' },
+  { key: 'adopted', label: 'Adopted' },
+]
+
+const SPECIES_KEYS = ['dog', 'cat', 'cow', 'other']
+
+const createEmptyMonthlyStats = () =>
+  MONTHLY_STAT_ROWS.reduce((accumulator, { key }) => {
+    SPECIES_KEYS.forEach((species) => {
+      accumulator[`${key}_${species}`] = 0
+    })
+    return accumulator
+  }, {})
+
+const getSpeciesBucket = (species) => {
+  const s = species?.toLowerCase()
+  if (s === 'dog') return 'dog'
+  if (s === 'cat') return 'cat'
+  if (s === 'cow') return 'cow'
+  return 'other'
+}
+
+const formatMonthKey = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
+const formatMonthLabel = (date) => date.toLocaleString('default', { month: 'long', year: 'numeric' })
+
+const getMonthBounds = (selectedYear, selectedMonth) => {
+  const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
+  const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+  return {
+    startDate,
+    endDate,
+  }
+}
+
+const normalizeMonthlyStatsRow = (row) =>
+  MONTHLY_STAT_ROWS.reduce((accumulator, { key }) => {
+    SPECIES_KEYS.forEach((species) => {
+      accumulator[`${key}_${species}`] = row?.[`${key}_${species}`] || 0
+    })
+    return accumulator
+  }, createEmptyMonthlyStats())
+
+const buildMonthlyStatsPayload = (monthKey, stats) => {
+  const payload = { month: monthKey }
+
+  MONTHLY_STAT_ROWS.forEach(({ key }) => {
+    SPECIES_KEYS.forEach((species) => {
+      payload[`${key}_${species}`] = stats?.[`${key}_${species}`] || 0
+    })
+  })
+
+  return payload
+}
+
+const extractSpecies = (row) => {
+  const relatedAnimal = row?.animals
+  if (Array.isArray(relatedAnimal)) return relatedAnimal[0]?.species
+  if (relatedAnimal && typeof relatedAnimal === 'object') return relatedAnimal.species
+  return row?.species
+}
+
+const countRowsBySpecies = (rows) => {
+  const counts = { dog: 0, cat: 0, cow: 0, other: 0 }
+  ;(rows || []).forEach((row) => {
+    counts[getSpeciesBucket(extractSpecies(row))] += 1
+  })
+  return counts
+}
+
+const applyCountsToStats = (stats, prefix, counts) => {
+  stats[`${prefix}_dog`] = counts.dog
+  stats[`${prefix}_cat`] = counts.cat
+  stats[`${prefix}_cow`] = counts.cow
+  stats[`${prefix}_other`] = counts.other
+}
+
+const monthlyStatsSelect = MONTHLY_STAT_ROWS.flatMap(({ key }) => SPECIES_KEYS.map((species) => `${key}_${species}`)).join(', ')
+
+const makeEmptySpeciesCounts = () => ({ dog: 0, cat: 0, cow: 0, other: 0 })
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [speciesCounts, setSpeciesCounts] = useState({ dog: 0, cat: 0, cow: 0, other: 0 })
-  const [monthlyStats, setMonthlyStats] = useState({})
-  const [originalStats, setOriginalStats] = useState({})
-  const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
-  const [selectedMonth, setSelectedMonth] = useState(new Date())
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false)
-  const [pickerMonth, setPickerMonth] = useState(selectedMonth.getMonth())
-  const [pickerYear, setPickerYear] = useState(selectedMonth.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [monthlyStats, setMonthlyStats] = useState(createEmptyMonthlyStats())
+  const [savedMonthlyStats, setSavedMonthlyStats] = useState(createEmptyMonthlyStats())
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError, setStatsError] = useState('')
+  const [statsNote, setStatsNote] = useState('')
+  const [editingCell, setEditingCell] = useState(null)
+  const [editingValue, setEditingValue] = useState('')
+  const [savingStats, setSavingStats] = useState(false)
 
-  const monthLabel = selectedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })
-  const monthKey = monthLabel.toLowerCase()
+  const selectedMonthKey = formatMonthKey(selectedMonth)
+  const currentMonthKey = formatMonthKey(new Date())
+  const monthLabel = formatMonthLabel(selectedMonth)
+  const isCurrentMonth = selectedMonthKey === currentMonthKey
 
-  const monthsList = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
-  const currentYear = new Date().getFullYear()
-  const yearsList = Array.from({ length: 11 }, (_, i) => currentYear - i)
+  const loadMonthlyStats = async (monthDate, { forceLive = false } = {}) => {
+    const monthKey = formatMonthKey(monthDate)
+    const liveMode = forceLive || monthKey === currentMonthKey
+    const { startDate, endDate } = getMonthBounds(monthDate.getFullYear(), monthDate.getMonth())
+    setStatsLoading(true)
+    setStatsNote('')
+    setStatsError('')
+    setEditingCell(null)
+    setEditingValue('')
+
+    try {
+      if (liveMode) {
+        let successCount = 0
+
+        const fetchRows = async (queryBuilder, label) => {
+          try {
+            const { data, error } = await queryBuilder
+            if (error) throw error
+            successCount += 1
+            return data || []
+          } catch (error) {
+            console.error(`Error fetching ${label}:`, error)
+            return []
+          }
+        }
+
+        const { data: admittedData, error: admittedError } = await supabase
+          .from('animals')
+          .select('species, ward')
+          .in('ward', ['ipd', 'inhouse'])
+          .eq('is_active', true)
+
+        if (admittedError) {
+          console.error('Admitted fetch error:', admittedError)
+        } else {
+          successCount += 1
+        }
+
+        const [releasedData, deathsData, bloodData, xrayData, surgeryData, opdData, rescueData, adoptedData] = await Promise.all([
+          fetchRows(
+            supabase
+              .from('animals')
+              .select('species')
+              .eq('current_status', 'released')
+              .gte('updated_at', startDate)
+              .lte('updated_at', endDate),
+            'released stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animals')
+              .select('species')
+              .eq('current_status', 'deceased')
+              .gte('updated_at', startDate)
+              .lte('updated_at', endDate),
+            'death stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animal_reports')
+              .select('animals(species)')
+              .eq('report_type', 'blood_test')
+              .gte('created_at', startDate)
+              .lte('created_at', endDate),
+            'blood test stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animal_reports')
+              .select('animals(species)')
+              .eq('report_type', 'x_ray')
+              .gte('created_at', startDate)
+              .lte('created_at', endDate),
+            'x-ray stats'
+          ),
+          fetchRows(
+            supabase
+              .from('surgeries')
+              .select('animals(species)')
+              .gte('created_at', startDate)
+              .lte('created_at', endDate),
+            'surgery stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animals')
+              .select('species')
+              .eq('ward', 'opd')
+              .gte('admission_date', startDate)
+              .lte('admission_date', endDate),
+            'OPD stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animals')
+              .select('species')
+              .eq('rescuer_type', 'Rescued Animal')
+              .gte('admission_date', startDate)
+              .lte('admission_date', endDate),
+            'rescue stats'
+          ),
+          fetchRows(
+            supabase
+              .from('animals')
+              .select('species')
+              .eq('current_status', 'adopted')
+              .gte('updated_at', startDate)
+              .lte('updated_at', endDate),
+            'adopted stats'
+          ),
+        ])
+
+        const liveStats = createEmptyMonthlyStats()
+        if (!admittedError) {
+          applyCountsToStats(liveStats, 'admitted', {
+            dog: admittedData.filter(a => getSpeciesBucket(a.species) === 'dog').length,
+            cat: admittedData.filter(a => getSpeciesBucket(a.species) === 'cat').length,
+            cow: admittedData.filter(a => getSpeciesBucket(a.species) === 'cow').length,
+            other: admittedData.filter(a => getSpeciesBucket(a.species) === 'other').length,
+          })
+        }
+        applyCountsToStats(liveStats, 'released', countRowsBySpecies(releasedData))
+        applyCountsToStats(liveStats, 'deaths', countRowsBySpecies(deathsData))
+        applyCountsToStats(liveStats, 'blood_test', countRowsBySpecies(bloodData))
+        applyCountsToStats(liveStats, 'xray', countRowsBySpecies(xrayData))
+        applyCountsToStats(liveStats, 'surgery', countRowsBySpecies(surgeryData))
+        applyCountsToStats(liveStats, 'opd', countRowsBySpecies(opdData))
+        applyCountsToStats(liveStats, 'rescue', countRowsBySpecies(rescueData))
+        applyCountsToStats(liveStats, 'adopted', countRowsBySpecies(adoptedData))
+
+        setMonthlyStats(liveStats)
+        setSavedMonthlyStats(liveStats)
+
+        if (successCount === 0) {
+          setStatsError('Failed to load monthly stats')
+          return
+        }
+
+        try {
+          const { error } = await supabase.from('monthly_stats').upsert(buildMonthlyStatsPayload(monthKey, liveStats), {
+            onConflict: 'month',
+          })
+
+          if (error) throw error
+        } catch (error) {
+          console.error('Error auto-saving current month stats:', error)
+        }
+        return
+      }
+
+      try {
+        const { data, error } = await supabase.from('monthly_stats').select(monthlyStatsSelect).eq('month', monthKey).maybeSingle()
+
+        if (error) throw error
+
+        if (data) {
+          const savedStats = normalizeMonthlyStatsRow(data)
+          setMonthlyStats(savedStats)
+          setSavedMonthlyStats(savedStats)
+          setStatsNote('')
+        } else {
+          const emptyStats = createEmptyMonthlyStats()
+          setMonthlyStats(emptyStats)
+          setSavedMonthlyStats(emptyStats)
+          setStatsNote('No data recorded for this month')
+        }
+      } catch (error) {
+        console.error('Error loading monthly stats:', error)
+        setStatsError('Failed to load monthly stats')
+        const emptyStats = createEmptyMonthlyStats()
+        setMonthlyStats(emptyStats)
+        setSavedMonthlyStats(emptyStats)
+      }
+    } catch (error) {
+      console.error('Error loading monthly stats:', error)
+      setStatsError('Failed to load monthly stats')
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  const handleSaveStats = async () => {
+    setSavingStats(true)
+    try {
+      const { error } = await supabase
+        .from('monthly_stats')
+        .upsert(buildMonthlyStatsPayload(selectedMonthKey, monthlyStats), { onConflict: 'month' })
+
+      if (error) throw error
+
+      setSavedMonthlyStats({ ...monthlyStats })
+      setStatsNote('')
+      setStatsError('')
+      alert('Stats saved successfully!')
+    } catch (error) {
+      console.error('Error saving stats:', error)
+      alert('Failed to save stats')
+    } finally {
+      setSavingStats(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSpeciesCounts = async () => {
       setLoading(true)
       try {
         const { data: animals } = await supabase.from('animals').select('species').eq('is_active', true)
@@ -41,121 +333,55 @@ export default function Dashboard() {
           })
           setSpeciesCounts(counts)
         }
-
-        const { data: stats } = await supabase
-          .from('monthly_stats')
-          .select('*')
-          .eq('month', monthKey)
-          .single()
-
-        const normalized = {
-          admitted_dog: stats?.admitted_dog || 0,
-          admitted_cat: stats?.admitted_cat || 0,
-          admitted_cow: stats?.admitted_cow || 0,
-          admitted_other: stats?.admitted_other || 0,
-          released_dog: stats?.released_dog || 0,
-          released_cat: stats?.released_cat || 0,
-          released_cow: stats?.released_cow || 0,
-          released_other: stats?.released_other || 0,
-          deaths_dog: stats?.deaths_dog || 0,
-          deaths_cat: stats?.deaths_cat || 0,
-          deaths_cow: stats?.deaths_cow || 0,
-          deaths_other: stats?.deaths_other || 0,
-          blood_test_dog: stats?.blood_test_dog || 0,
-          blood_test_cat: stats?.blood_test_cat || 0,
-          blood_test_cow: stats?.blood_test_cow || 0,
-          blood_test_other: stats?.blood_test_other || 0,
-          xray_dog: stats?.xray_dog || 0,
-          xray_cat: stats?.xray_cat || 0,
-          xray_cow: stats?.xray_cow || 0,
-          xray_other: stats?.xray_other || 0,
-          surgery_dog: stats?.surgery_dog || 0,
-          surgery_cat: stats?.surgery_cat || 0,
-          surgery_cow: stats?.surgery_cow || 0,
-          surgery_other: stats?.surgery_other || 0,
-          opd_dog: stats?.opd_dog || 0,
-          opd_cat: stats?.opd_cat || 0,
-          opd_cow: stats?.opd_cow || 0,
-          opd_other: stats?.opd_other || 0,
-          rescue_dog: stats?.rescue_dog || 0,
-          rescue_cat: stats?.rescue_cat || 0,
-          rescue_cow: stats?.rescue_cow || 0,
-          rescue_other: stats?.rescue_other || 0,
-          adopted_dog: stats?.adopted_dog || 0,
-          adopted_cat: stats?.adopted_cat || 0,
-          adopted_cow: stats?.adopted_cow || 0,
-          adopted_other: stats?.adopted_other || 0,
-        }
-        setMonthlyStats(normalized)
-        setOriginalStats({ ...normalized })
       } catch (error) {
         console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
-    fetchData()
-  }, [monthKey])
+    fetchSpeciesCounts()
+  }, [])
 
-  const handleCellChange = (key, value) => {
-    setMonthlyStats((prev) => ({ ...prev, [key]: parseInt(value) || 0 }))
-    setIsEditing(true)
+  useEffect(() => {
+    loadMonthlyStats(selectedMonth)
+  }, [selectedMonthKey])
+
+  const handlePreviousMonth = () => {
+    setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
   }
 
-  const handleSaveStats = async () => {
-    try {
-      const { error } = await supabase
-        .from('monthly_stats')
-        .upsert({ month: monthKey, ...monthlyStats }, { onConflict: 'month' })
+  const handleNextMonth = () => {
+    setSelectedMonth((prev) => {
+      const next = new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+      return formatMonthKey(next) > currentMonthKey ? prev : next
+    })
+  }
 
-      if (!error) {
-        setOriginalStats({ ...monthlyStats })
-        setIsEditing(false)
-        alert('Stats saved successfully!')
-      }
-    } catch (error) {
-      console.error('Error saving stats:', error)
-      alert('Failed to save stats')
-    }
+  const startEditingCell = (cellKey) => {
+    setEditingCell(cellKey)
+    setEditingValue(String(monthlyStats[cellKey] || 0))
+  }
+
+  const commitEditingCell = () => {
+    if (!editingCell) return
+    const nextValue = Number.parseInt(editingValue, 10)
+    setMonthlyStats((prev) => ({
+      ...prev,
+      [editingCell]: Number.isNaN(nextValue) ? 0 : Math.max(0, nextValue),
+    }))
+    setEditingCell(null)
+    setEditingValue('')
+  }
+
+  const cancelEditingCell = () => {
+    setEditingCell(null)
+    setEditingValue('')
   }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/', { replace: true })
-  }
-
-  const renderCell = (activity, species) => {
-    const key = `${activity.toLowerCase().replace(/\s+/g, '_')}_${species.toLowerCase()}`
-    const value = monthlyStats[key] || 0
-
-    return (
-      <td
-        key={key}
-        onClick={() => {
-          const newVal = prompt(`Enter value for ${activity} - ${species}:`, value)
-          if (newVal !== null) handleCellChange(key, newVal)
-        }}
-        style={{
-          cursor: 'pointer',
-          padding: '10px 8px',
-          textAlign: 'center',
-          border: '1px solid #EFEFEF',
-          fontSize: '14px',
-        }}
-      >
-        {value}
-      </td>
-    )
-  }
-
-  const calculateTotal = (activity) => {
-    const baseKey = activity.toLowerCase().replace(/\s+/g, '_')
-    return (
-      (monthlyStats[`${baseKey}_dog`] || 0) +
-      (monthlyStats[`${baseKey}_cat`] || 0) +
-      (monthlyStats[`${baseKey}_cow`] || 0) +
-      (monthlyStats[`${baseKey}_other`] || 0)
-    )
   }
 
   const speciesCards = [
@@ -164,6 +390,83 @@ export default function Dashboard() {
     { key: 'cow', label: 'Cows', emoji: '🐄' },
     { key: 'other', label: 'Other', emoji: '🐾' },
   ]
+
+  const hasUnsavedChanges = JSON.stringify(monthlyStats) !== JSON.stringify(savedMonthlyStats)
+
+  const renderEditableCell = (activityKey, species) => {
+    const cellKey = `${activityKey}_${species}`
+    const value = monthlyStats[cellKey] || 0
+    const isEditing = editingCell === cellKey
+    const isDirty = monthlyStats[cellKey] !== savedMonthlyStats[cellKey]
+
+    return (
+      <td key={cellKey} style={{ padding: '10px 8px', borderBottom: '1px solid #F0F0F0' }}>
+        {isEditing ? (
+          <input
+            type="number"
+            min="0"
+            autoFocus
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={commitEditingCell}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEditingCell()
+              if (e.key === 'Escape') cancelEditingCell()
+            }}
+            style={{
+              width: '100%',
+              border: '1px solid #D6D6D6',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              fontSize: '20px',
+              fontWeight: 700,
+              textAlign: 'center',
+              color: '#1A1A1A',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        ) : (
+          <div
+            onClick={() => startEditingCell(cellKey)}
+            style={{
+              minHeight: '46px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontSize: '20px',
+              fontWeight: 700,
+              color: '#111111',
+              userSelect: 'none',
+              position: 'relative',
+            }}
+          >
+            <span>{value}</span>
+            {isDirty && (
+              <span
+                title="Manually changed"
+                style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '6px',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '999px',
+                  background: '#F5C800',
+                }}
+              />
+            )}
+          </div>
+        )}
+      </td>
+    )
+  }
+
+  const calculateTotal = (activityKey) =>
+    SPECIES_KEYS.reduce((sum, species) => sum + (monthlyStats[`${activityKey}_${species}`] || 0), 0)
 
   if (loading) return <div style={{ padding: '24px', textAlign: 'center', color: '#888' }}>Loading…</div>
 
@@ -300,6 +603,12 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main style={{ padding: '20px 16px' }}>
+        <style>{`
+          @keyframes dashboard-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
         {/* Species Summary */}
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '14px', color: '#1A1A1A' }}>
@@ -337,191 +646,128 @@ export default function Dashboard() {
 
         {/* Monthly Stats Table */}
         <div style={{ marginBottom: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', position: 'relative' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#1A1A1A' }}>
-              {monthLabel} Stats
-            </h2>
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => {
-                  setPickerMonth(selectedMonth.getMonth())
-                  setPickerYear(selectedMonth.getFullYear())
-                  setShowMonthDropdown(!showMonthDropdown)
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '4px',
-                  color: '#555',
-                }}
-              >
-                ▼
-              </button>
-              {showMonthDropdown && (
-                <>
-                  <div
-                    onClick={() => setShowMonthDropdown(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      background: '#FFF',
-                      border: '1px solid #E0E0E0',
-                      borderRadius: '12px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                      zIndex: 100,
-                      width: '280px',
-                      padding: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '8px', height: '220px' }}>
-                      {/* Month Column */}
-                      <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid #F0F0F0', paddingRight: '4px' }}>
-                        {monthsList.map((m, i) => {
-                          const isSelected = i === pickerMonth;
-                          return (
-                            <div
-                              key={m}
-                              onClick={() => setPickerMonth(i)}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                background: isSelected ? '#FFF4BF' : 'transparent',
-                                color: isSelected ? '#C49A00' : '#333',
-                                fontWeight: isSelected ? 600 : 500,
-                                borderRadius: '6px',
-                                marginBottom: '2px',
-                                fontSize: '14px',
-                                transition: 'background 0.2s',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) e.target.style.background = '#FAFAFA'
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) e.target.style.background = 'transparent'
-                              }}
-                            >
-                              {m}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      
-                      {/* Year Column */}
-                      <div style={{ flex: 1, overflowY: 'auto', paddingLeft: '4px' }}>
-                        {yearsList.map((y) => {
-                          const isSelected = y === pickerYear;
-                          return (
-                            <div
-                              key={y}
-                              onClick={() => setPickerYear(y)}
-                              style={{
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                                background: isSelected ? '#FFF4BF' : 'transparent',
-                                color: isSelected ? '#C49A00' : '#333',
-                                fontWeight: isSelected ? 600 : 500,
-                                borderRadius: '6px',
-                                marginBottom: '2px',
-                                fontSize: '14px',
-                                transition: 'background 0.2s',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) e.target.style.background = '#FAFAFA'
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) e.target.style.background = 'transparent'
-                              }}
-                            >
-                              {y}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    
+          <div style={{ background: '#F5C800', borderRadius: '18px 18px 0 0', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <button
+              onClick={handlePreviousMonth}
+              style={{ background: 'rgba(0,0,0,0.08)', border: 'none', width: '34px', height: '34px', borderRadius: '999px', cursor: 'pointer', fontSize: '18px', fontWeight: 700, color: '#1A1A1A' }}
+              aria-label="Previous month"
+            >
+              ←
+            </button>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#1A1A1A', textAlign: 'center', flex: 1 }}>
+              {monthLabel}
+            </div>
+            <button
+              onClick={handleNextMonth}
+              disabled={isCurrentMonth}
+              style={{
+                background: isCurrentMonth ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.08)',
+                border: 'none',
+                width: '34px',
+                height: '34px',
+                borderRadius: '999px',
+                cursor: isCurrentMonth ? 'not-allowed' : 'pointer',
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isCurrentMonth ? '#8A8A8A' : '#1A1A1A'
+              }}
+              aria-label="Next month"
+            >
+              →
+            </button>
+          </div>
+
+          <div style={{ border: '1px solid #F0F0F0', borderTop: 'none', borderRadius: '0 0 18px 18px', overflow: 'hidden', background: '#FFFFFF' }}>
+            {statsLoading ? (
+              <div style={{ padding: '28px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: '#666' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '3px solid #E5E7EB', borderTopColor: '#F5C800', animation: 'dashboard-spin 0.9s linear infinite' }} />
+                <div>Loading monthly stats...</div>
+              </div>
+            ) : (
+              <>
+                {statsError && (
+                  <div style={{ padding: '12px 14px 0', fontSize: '13px', color: '#B45309' }}>{statsError}</div>
+                )}
+                {statsNote && (
+                  <div style={{ padding: '12px 14px 0', fontSize: '13px', color: '#666' }}>{statsNote}</div>
+                )}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '840px' }}>
+                    <thead>
+                      <tr style={{ background: '#F5C800' }}>
+                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Activity</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Dog</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Cat</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Cow</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Other</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MONTHLY_STAT_ROWS.map(({ key, label }, index) => {
+                        return (
+                          <tr key={key} style={{ background: index % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                            <td style={{ padding: '14px', borderBottom: '1px solid #F0F0F0', fontSize: '14px', fontWeight: 600, color: '#1A1A1A' }}>
+                              {label}
+                            </td>
+                            {renderEditableCell(key, 'dog')}
+                            {renderEditableCell(key, 'cat')}
+                            {renderEditableCell(key, 'cow')}
+                            {renderEditableCell(key, 'other')}
+                            <td style={{ padding: '10px 14px', borderBottom: '1px solid #F0F0F0', textAlign: 'center', fontSize: '20px', fontWeight: 800, color: '#111111' }}>
+                              {calculateTotal(key)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ padding: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {hasUnsavedChanges && (
                     <button
-                      onClick={() => {
-                        setSelectedMonth(new Date(pickerYear, pickerMonth, 1));
-                        setShowMonthDropdown(false);
-                      }}
+                      onClick={handleSaveStats}
+                      disabled={savingStats}
                       style={{
-                        width: '100%',
                         background: '#F5C800',
-                        color: '#000000',
+                        color: '#1A1A1A',
                         border: 'none',
-                        borderRadius: '8px',
-                        padding: '10px',
+                        borderRadius: '999px',
+                        padding: '12px 18px',
                         fontSize: '14px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
+                        fontWeight: 800,
+                        cursor: savingStats ? 'not-allowed' : 'pointer',
+                        opacity: savingStats ? 0.75 : 1,
                       }}
                     >
-                      Apply
+                      {savingStats ? 'Saving...' : 'Save Changes'}
                     </button>
-                  </div>
-                </>
-              )}
-            </div>
+                  )}
+
+                  {isCurrentMonth && (
+                    <button
+                      onClick={() => loadMonthlyStats(selectedMonth, { forceLive: true })}
+                      disabled={statsLoading}
+                      style={{
+                        background: '#E5E7EB',
+                        color: '#1F2937',
+                        border: 'none',
+                        borderRadius: '999px',
+                        padding: '12px 18px',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        cursor: statsLoading ? 'not-allowed' : 'pointer',
+                        opacity: statsLoading ? 0.75 : 1,
+                      }}
+                    >
+                      Recalculate
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ overflowX: 'auto', borderRadius: '16px', border: '1px solid #F0F0F0' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#FAFAFA', minWidth: '400px' }}>
-              <thead>
-                <tr style={{ background: '#F5C800' }}>
-                  <th style={{ padding: '12px 10px', textAlign: 'left', fontSize: '13px', fontWeight: 700 }}>Activity</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Dog</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Cat</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Cow</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Other</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: '13px', fontWeight: 700 }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['Admitted', 'Released', 'Deaths', 'Blood Test', 'X-Ray', 'Surgery', 'OPD', 'Rescue', 'Adopted'].map(
-                  (activity, i) => (
-                    <tr key={activity} style={{ background: i % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
-                      <td style={{ padding: '10px', fontWeight: 600, fontSize: '13px', borderBottom: '1px solid #F0F0F0' }}>{activity}</td>
-                      {renderCell(activity, 'dog')}
-                      {renderCell(activity, 'cat')}
-                      {renderCell(activity, 'cow')}
-                      {renderCell(activity, 'other')}
-                      <td style={{ padding: '10px 8px', textAlign: 'center', borderBottom: '1px solid #F0F0F0', fontWeight: 700, fontSize: '14px', color: '#F5C800' }}>
-                        {calculateTotal(activity)}
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
-          {isEditing && (
-            <button
-              onClick={handleSaveStats}
-              style={{
-                marginTop: '14px',
-                width: '100%',
-                background: '#F5C800',
-                color: '#000000',
-                border: 'none',
-                borderRadius: '50px',
-                padding: '14px',
-                fontSize: '15px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Save Stats
-            </button>
-          )}
         </div>
       </main>
 

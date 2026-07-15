@@ -10,6 +10,8 @@ const getStatusColor = (status) => {
   if (s === 'moderate') return '#F97316'
   if (s === 'stable') return '#22C55E'
   if (s === 'recovered') return '#22C55E'
+  if (s === 'released') return '#3B82F6'
+  if (s === 'adopted') return '#8B5CF6'
   return '#E0E0E0'
 }
 
