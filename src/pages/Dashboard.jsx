@@ -608,6 +608,20 @@ export default function Dashboard() {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
           }
+          @media (max-width: 768px) {
+            .stats-table th, .stats-table td {
+              padding: 6px 4px !important;
+              font-size: 13px !important;
+            }
+            .stats-table td > div {
+              min-height: 36px !important;
+              font-size: 16px !important;
+            }
+            .stats-table input {
+              font-size: 16px !important;
+              padding: 6px 4px !important;
+            }
+          }
         `}</style>
         {/* Species Summary */}
         <div style={{ marginBottom: '32px' }}>
@@ -692,7 +706,7 @@ export default function Dashboard() {
                   <div style={{ padding: '12px 14px 0', fontSize: '13px', color: '#666' }}>{statsNote}</div>
                 )}
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '840px' }}>
+                  <table className="stats-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#F5C800' }}>
                         <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '13px', fontWeight: 800, color: '#1A1A1A' }}>Activity</th>

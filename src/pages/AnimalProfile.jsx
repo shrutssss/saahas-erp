@@ -487,8 +487,7 @@ export default function AnimalProfile() {
 
       if (animalRes.data) {
         setAnimal(animalRes.data)
-        const status = animalRes.data.current_status
-        setStatusUpdate(['recovered', 'released', 'adopted', 'deceased'].includes(status) ? status : '')
+        setStatusUpdate('')
       }
       if (photosRes.data) setPhotos(photosRes.data)
       if (medicalRes.error) console.error('Error fetching medical records:', medicalRes.error)
@@ -640,6 +639,9 @@ export default function AnimalProfile() {
         .single()
 
       if (error) throw error
+
+      await supabase.from('animals').update({ requires_vet_attention: false }).eq('id', id);
+      setAnimal((prev) => ({ ...prev, requires_vet_attention: false }));
 
       setMedicalRecords((prev) => [data, ...prev])
       setShowMedicalForm(false)
@@ -1097,10 +1099,6 @@ export default function AnimalProfile() {
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_date || '—'}</p>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Admission Date</label>
-                <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.admission_date || '—'}</p>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Rescue Location</label>
                 <p style={{ margin: 0, fontSize: '14px', color: '#1A1A1A' }}>{animal.rescue_location || '—'}</p>
               </div>
@@ -1160,12 +1158,17 @@ export default function AnimalProfile() {
                         <img 
                           src={animal.reporter_photo_url}
                           alt="Reporter"
+                          onClick={() => {
+                            setSelectedPhoto({ photo_url: animal.reporter_photo_url })
+                            setShowPhotoModal(true)
+                          }}
                           style={{ 
                             width: 100, 
                             height: 100, 
                             objectFit: 'cover', 
                             borderRadius: 12,
-                            border: '2px solid #F5C800'
+                            border: '2px solid #F5C800',
+                            cursor: 'pointer'
                           }}
                         />
                       </div>

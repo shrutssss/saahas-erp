@@ -100,7 +100,7 @@ export default function Tracking() {
           <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#1A1A1A' }}>
             Tracking
           </h1>
-          {animals.length > 0 && (
+          {filtered.length > 0 && (
             <span style={{
               backgroundColor: '#EF4444',
               color: '#FFFFFF',
@@ -109,7 +109,7 @@ export default function Tracking() {
               fontSize: '12px',
               fontWeight: 700,
             }}>
-              {animals.length}
+              {filtered.length}
             </span>
           )}
         </div>

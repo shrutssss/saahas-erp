@@ -453,6 +453,7 @@ export default function Registration() {
         reporter_address: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_address : null,
         reporter_phone: formData.rescuer_type === 'Animal Bought by Reporter' ? formData.reporter_phone : null,
         reporter_photo_url: reporterPhotoUrl || null,
+        requires_vet_attention: true,
       }
 
       let savedAnimalId = editAnimal?.id || null
