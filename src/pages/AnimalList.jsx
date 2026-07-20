@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import SaahasLogo from '../components/SaahasLogo'
-import ImagePreviewModal from '../components/ImagePreviewModal'
 import { ArrowLeft } from 'lucide-react'
 
 export default function AnimalList({ ward = 'opd' }) {
@@ -14,7 +13,6 @@ export default function AnimalList({ ward = 'opd' }) {
   const [speciesFilter, setSpeciesFilter] = useState('all')
   const [conditionFilters, setConditionFilters] = useState(new Set())
   const [searchQuery, setSearchQuery] = useState('')
-  const [previewModalConfig, setPreviewModalConfig] = useState({ isOpen: false, imageUrl: '', title: '' })
 
   const wardTitle = ward === 'opd' ? 'OPD' : ward === 'ipd' ? 'IPD' : 'In-House'
   const conditions = ward === 'opd'
@@ -284,19 +282,10 @@ export default function AnimalList({ ward = 'opd' }) {
                   <img
                     src={animal.animal_photos[0].photo_url}
                     alt={animal.name}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setPreviewModalConfig({
-                        isOpen: true,
-                        imageUrl: animal.animal_photos[0].photo_url,
-                        title: animal.name
-                      })
-                    }}
                     style={{
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
-                      cursor: 'pointer'
                     }}
                   />
                 ) : (
@@ -337,14 +326,6 @@ export default function AnimalList({ ward = 'opd' }) {
           ))
         )}
       </div>
-
-      {previewModalConfig.isOpen && (
-        <ImagePreviewModal
-          imageUrl={previewModalConfig.imageUrl}
-          title={previewModalConfig.title}
-          onClose={() => setPreviewModalConfig({ isOpen: false })}
-        />
-      )}
     </div>
   )
 }

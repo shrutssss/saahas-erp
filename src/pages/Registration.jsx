@@ -1027,9 +1027,8 @@ export default function Registration() {
         {/* 15. Photos */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-            Add Photo
+            Add Photos
           </label>
-          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666' }}>Tap to add one photo at a time</p>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
             <button
               type="button"
@@ -1047,11 +1046,12 @@ export default function Registration() {
                 whiteSpace: 'nowrap'
               }}
             >
-              Add Photo
+              Choose Files
             </button>
             <input
               ref={animalUploadInputRef}
               type="file"
+              multiple
               accept="image/*"
               style={{ display: 'none' }}
               onChange={handlePhotoChange}
