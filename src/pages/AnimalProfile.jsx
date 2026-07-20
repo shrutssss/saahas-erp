@@ -3,6 +3,7 @@ import { useEffect, useState, useContext, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { AuthContext } from '../AuthContext'
 import SaahasLogo, { brandFont } from '../components/SaahasLogo'
+import ImagePreviewModal from '../components/ImagePreviewModal'
 import { ArrowLeft, Pencil, Trash2, Eye, Activity, Syringe, Bandage, FileText, Mars, Venus, FlaskConical, BugOff, Scissors } from 'lucide-react'
 
 const getStatusColor = (status) => {
@@ -286,8 +287,7 @@ export default function AnimalProfile() {
   const [surgeries, setSurgeries] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('details')
-  const [selectedPhoto, setSelectedPhoto] = useState(null)
-  const [showPhotoModal, setShowPhotoModal] = useState(false)
+  const [previewModalConfig, setPreviewModalConfig] = useState({ isOpen: false })
 
   const [showMedicalForm, setShowMedicalForm] = useState(false)
   const [showTreatmentSheetForm, setShowTreatmentSheetForm] = useState(false)
@@ -525,6 +525,47 @@ export default function AnimalProfile() {
     
     const data = await response.json()
     return data.secure_url
+  }
+
+  const handleEditPhoto = async (file, type, itemData) => {
+    try {
+      const url = await uploadToCloudinary(file)
+      if (type === 'animal_photo') {
+        await supabase.from('animal_photos').update({ photo_url: url }).eq('id', itemData.id)
+      } else if (type === 'treatment_sheet') {
+        await supabase.from('treatment_sheets').update({ image_url: url }).eq('id', itemData.id)
+      } else if (type === 'report') {
+        await supabase.from('animal_reports').update({ image_url: url }).eq('id', itemData.id)
+      } else if (type === 'recovery') {
+        await supabase.from('animals').update({ recovery_photo_url: url }).eq('id', animal.id)
+      } else if (type === 'reporter') {
+        await supabase.from('animals').update({ reporter_photo_url: url }).eq('id', animal.id)
+      }
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to replace photo')
+    }
+  }
+
+  const handleDeletePhoto = async (type, itemData) => {
+    try {
+      if (type === 'animal_photo') {
+        await supabase.from('animal_photos').delete().eq('id', itemData.id)
+      } else if (type === 'treatment_sheet') {
+        await supabase.from('treatment_sheets').delete().eq('id', itemData.id)
+      } else if (type === 'report') {
+        await supabase.from('animal_reports').delete().eq('id', itemData.id)
+      } else if (type === 'recovery') {
+        await supabase.from('animals').update({ recovery_photo_url: null }).eq('id', animal.id)
+      } else if (type === 'reporter') {
+        await supabase.from('animals').update({ reporter_photo_url: null }).eq('id', animal.id)
+      }
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      showToast('error', 'Failed to delete photo')
+    }
   }
 
   const handleStatusUpdate = async () => {
@@ -902,8 +943,13 @@ export default function AnimalProfile() {
                   <div
                     style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
                     onClick={() => {
-                      setSelectedPhoto(photos[0])
-                      setShowPhotoModal(true)
+                      setPreviewModalConfig({
+                        isOpen: true,
+                        imageUrl: photos[0].photo_url,
+                        title: 'Animal Photo',
+                        onEdit: (file) => handleEditPhoto(file, 'animal_photo', photos[0]),
+                        onDelete: () => handleDeletePhoto('animal_photo', photos[0]),
+                      })
                     }}
                   >
                     <img src={photos[0].photo_url} alt="On admission" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -920,8 +966,13 @@ export default function AnimalProfile() {
                   <div
                     style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#F5F5F5', cursor: 'pointer' }}
                     onClick={() => {
-                      setSelectedPhoto({ photo_url: animal.recovery_photo_url })
-                      setShowPhotoModal(true)
+                      setPreviewModalConfig({
+                        isOpen: true,
+                        imageUrl: animal.recovery_photo_url,
+                        title: 'Recovery Photo',
+                        onEdit: (file) => handleEditPhoto(file, 'recovery'),
+                        onDelete: () => handleDeletePhoto('recovery'),
+                      })
                     }}
                   >
                     <img src={animal.recovery_photo_url} alt="On Release" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -945,8 +996,13 @@ export default function AnimalProfile() {
                     src={p.photo_url}
                     alt=""
                     onClick={() => {
-                      setSelectedPhoto(p)
-                      setShowPhotoModal(true)
+                      setPreviewModalConfig({
+                        isOpen: true,
+                        imageUrl: p.photo_url,
+                        title: 'Animal Photo',
+                        onEdit: (file) => handleEditPhoto(file, 'animal_photo', p),
+                        onDelete: () => handleDeletePhoto('animal_photo', p),
+                      })
                     }}
                     style={{ width: '40px', height: '40px', borderRadius: '4px', cursor: 'pointer', objectFit: 'cover' }}
                   />
@@ -1159,8 +1215,13 @@ export default function AnimalProfile() {
                           src={animal.reporter_photo_url}
                           alt="Reporter"
                           onClick={() => {
-                            setSelectedPhoto({ photo_url: animal.reporter_photo_url })
-                            setShowPhotoModal(true)
+                            setPreviewModalConfig({
+                              isOpen: true,
+                              imageUrl: animal.reporter_photo_url,
+                              title: 'Reporter Photo',
+                              onEdit: (file) => handleEditPhoto(file, 'reporter'),
+                              onDelete: () => handleDeletePhoto('reporter'),
+                            })
                           }}
                           style={{ 
                             width: 100, 
@@ -1304,7 +1365,16 @@ export default function AnimalProfile() {
                     <img
                       src={sheet.image_url}
                       alt={`Treatment sheet uploaded by ${sheet.reporter_name}`}
-                      style={{ width: '100%', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F8F8F8' }}
+                      onClick={() => {
+                        setPreviewModalConfig({
+                          isOpen: true,
+                          imageUrl: sheet.image_url,
+                          title: 'Treatment Sheet',
+                          onEdit: (file) => handleEditPhoto(file, 'treatment_sheet', sheet),
+                          onDelete: () => handleDeletePhoto('treatment_sheet', sheet),
+                        })
+                      }}
+                      style={{ width: '100%', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F8F8F8', cursor: 'pointer' }}
                     />
                   </div>
                 ))
@@ -1331,7 +1401,16 @@ export default function AnimalProfile() {
                     <img
                       src={report.image_url}
                       alt={`${getReportTypeLabel(report.report_type, report.custom_report_type)} report`}
-                      style={{ width: '100%', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F8F8F8' }}
+                      onClick={() => {
+                        setPreviewModalConfig({
+                          isOpen: true,
+                          imageUrl: report.image_url,
+                          title: 'Diagnostic Report',
+                          onEdit: (file) => handleEditPhoto(file, 'report', report),
+                          onDelete: () => handleDeletePhoto('report', report),
+                        })
+                      }}
+                      style={{ width: '100%', borderRadius: '12px', border: '1px solid #E0E0E0', backgroundColor: '#F8F8F8', cursor: 'pointer' }}
                     />
                   </div>
                 ))
@@ -1341,13 +1420,14 @@ export default function AnimalProfile() {
         </div>
       </main>
 
-      {showPhotoModal && (
-        <div
-          onClick={() => setShowPhotoModal(false)}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-        >
-          <img src={selectedPhoto.photo_url} alt="" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px' }} />
-        </div>
+      {previewModalConfig.isOpen && (
+        <ImagePreviewModal
+          imageUrl={previewModalConfig.imageUrl}
+          title={previewModalConfig.title}
+          onClose={() => setPreviewModalConfig({ isOpen: false })}
+          onEdit={previewModalConfig.onEdit}
+          onDelete={previewModalConfig.onDelete}
+        />
       )}
 
       {showSurgeryForm && (
