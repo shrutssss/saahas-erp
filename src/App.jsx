@@ -15,7 +15,7 @@ import TreatmentSheet from './pages/TreatmentSheet'
 function ProtectedRoute() {
   const { user, loading } = useContext(AuthContext)
 
-  if (loading) return <div style={{ padding: '16px' }}>Loading...</div>
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading...</div>
   if (!user) return <Navigate to="/" replace />
 
   return <Outlet />

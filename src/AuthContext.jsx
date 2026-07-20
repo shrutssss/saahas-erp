@@ -11,36 +11,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    const initAuth = async () => {
-      const { data } = await supabase.auth.getSession()
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return
-
-      if (data?.session?.user) {
-        setUser(data.session.user)
-        // Fetch user role from profiles table
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.session.user.id)
-            .single()
-          if (profile?.role) setRole(profile.role)
-        } catch (e) {
-          console.error('Failed to fetch user role:', e)
-        }
-      }
-      setLoading(false)
-    }
-
-    initAuth()
-
-    // Listen for auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-        setRole(null)
-      } else if (session) {
+      if (session) {
         setUser(session.user)
         try {
           const { data: profile } = await supabase
@@ -53,11 +26,34 @@ export function AuthProvider({ children }) {
           console.error('Failed to fetch user role:', e)
         }
       }
+      setLoading(false)
     })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setRole(null)
+        } else if (session) {
+          setUser(session.user)
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single()
+            if (profile?.role) setRole(profile.role)
+          } catch (e) {
+            console.error('Failed to fetch user role:', e)
+          }
+        }
+      }
+    )
 
     return () => {
       mounted = false
-      listener?.subscription?.unsubscribe?.()
+      subscription.unsubscribe()
     }
   }, [])
 

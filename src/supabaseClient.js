@@ -102,4 +102,12 @@ const mockSupabase = { _authCallback: null,
   },
 }
 
-export const supabase = isMock ? mockSupabase : createClient(supabaseUrl, supabaseKey)
+export const supabase = isMock ? mockSupabase : createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    storageKey: 'saahas-auth',
+    storage: window.localStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+})
