@@ -90,10 +90,8 @@ export default function AnimalList({ ward = 'opd' }) {
   }
 
   const handleConditionToggle = (condition) => {
-    const updated = new Set(conditionFilters)
-    if (updated.has(condition)) {
-      updated.delete(condition)
-    } else {
+    const updated = new Set()
+    if (!conditionFilters.has(condition)) {
       updated.add(condition)
     }
     setConditionFilters(updated)
