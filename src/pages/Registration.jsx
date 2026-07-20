@@ -444,7 +444,7 @@ export default function Registration() {
         admission_date: formData.admission_date || new Date().toISOString().split('T')[0],
         rescue_location: formData.rescue_location,
         ward: formData.ward,
-        category: formData.category,
+        category: formData.category || null,
         lss_incharge: formData.lss_incharge,
         initial_assessment: formData.initial_assessment,
         reason_for_admission: formData.reason_for_admission,
@@ -848,13 +848,12 @@ export default function Registration() {
         {formData.ward && formData.ward !== 'opd' && (
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
-              Category *
+              Category
             </label>
             <select
               name="category"
               value={formData.category}
               onChange={handleInputChange}
-              required
               style={{
                 width: '100%',
                 padding: '12px',
